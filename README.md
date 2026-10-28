@@ -1,0 +1,2 @@
+# ProjeWithOmer
+KNK DEVIATIONS VE TASKS BURAYA 
