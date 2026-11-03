@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D78**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D80**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -874,6 +874,33 @@ Grup = bir satırın 16 PE çıkışı (sütunlar farklı çıkış kanalları),
   last_group yalnızca satır 0'ın maskesiyle).
 - **Durum:** Claude, 04.11, 5b. `dizi/run_sim.tcl`'ye eklendi; Vivado GUI'de `tb_pe_dizi` 2.363.392/2.363.392 ve
   `tb_grup_kurucu` 664/664 PASS (Ego, 04.11, araç tuzağı 13'ün düzeltmesinden sonra).
+
+### 5b-3 kararları (04.11, Ego): tam Shao sistemi
+Ego'nun seçimi: 5b'nin kalanı Fig. 8'in tam yapısıyla (ayrı giriş/ağırlık/çıkış tamponları, çok bankalı,
+dizi için yeni FSM komutları, tam sistem testi). NITI'nin kaynak kodu bu kararlar için incelendi
+(`github.com/wangmaolin/niti`: README, `ti_torch.py`, `ti_net.py`, `ti_loss.py`, 04.11): NITI GPU üzerinde
+çalışan bir PyTorch/CUDA eğitim kodu; tampon, bank, ön-getirme, PE dizisi ya da döngü çizelgesi içermiyor.
+Ölçekleme bütün tensör için tek kaydırmayla yapılıyor (`RangeEstimate`, `act_calc`, `err_calc`,
+`grad_calc`); grup kavramı yok. Bu yüzden aşağıdaki kararlarda NITI hakem olamıyor `[NITI GitHub]`.
+
+### D78 — GMS, Fig. 6'daki yerinde: tampondan PE'ye giderken uygulanır (D44'ü geri alır)
+- **Ne:** SRU'nun LMS çıkışı (int8) çıkış tamponuna yazılır, grubun l'si saklanır. Sonraki işte ön-getirme
+  her değere kendi grubunun Δ = G − l kaydırmasını uygulayarak PE'ye verir. Adım 4'teki ayrı KOPYA
+  geçişi (D44, D64 A3) dizi sisteminde yok.
+- **Kanıt:** `[PDF tam]` III-B (s. 257): "Before the int8 values are passed to PEs for the next stage
+  computation, they need to be scaled by the second stage (GMS)". `[PDF şekil]` Fig. 6: GMS tampon ile PE
+  arasında. ReLU ile GMS'in sırası sonucu değiştirmiyor (D53), ReLU LMS çıkışında uygulanabilir.
+- **Durum:** Ego, 04.11 ("Fig. 6: PE'ye giderken"). Uygulama 5b-3'te.
+
+### D79 — Giriş tamponu: giriş satırı r, bank (r mod 16)'da; ön-getirme satırları PE satırlarına dağıtır
+- **Ne:** III-D'deki "each bank corresponds to one PE row" için: 16 bank, satır r → bank r mod 16. Stride 1'de
+  PE satırı i, i, i+1, i+2 satırlarını ister; ön-getirme modülü bankları PE satırlarına yönlendirir, kopya
+  yok. Ağırlık tamponu: bank j = dizinin j. sütunu (çıkış kanalı, D72; WG'de hata, D73).
+- **Kanıt:** `[PDF tam]` III-D: "multi-bank manner, and each bank corresponds to one PE row or column".
+  `[PDF şekil]` Fig. 8: Input Prefetch Module tampon ile PE'ler arasında; III-A: ön-getirme "arranges the
+  input data in an appropriate manner according to the computation patterns". Örtüşen satırların bankalara
+  nasıl yerleştiği metinde yok. `[Çıkarım]`
+- **Durum:** Ego, 04.11. Uygulama 5b-3'te.
 
 ---
 
