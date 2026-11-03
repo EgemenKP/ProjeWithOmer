@@ -1,0 +1,36 @@
+Fonksiyon motoru golden modeli — okunur döküm
+SRU kararları: ALT_YARI=shao, TEK_BP=makale, DOYMA=False, GMS_KAYDIRMA=fark; B = bit_length (D28)
+FE kararları : HEDEF_G=m_u, WU_DOYMA=True, GMS_WU_ONCESI=True
+
+== ReLU örnekleri ==
+     a      e  relu(a)  e_geri
+    57     33       57      33
+   -20     33        0       0
+     0     33        0       0
+     1   -128        1    -128
+  -128     77        0       0
+   127     -1      127      -1
+
+Zincir örneği: x32 = 2040, LMS (l = 4) -> -128 (taşma = 1, 8 bitte sarıldı) -> ReLU -> 0
+  (Gerçek değer 2040/16 = 127,5; SRU'da doyma olmadığı için pozitif değer ReLU'dan 0 çıkar.)
+
+== Ağırlık güncelleme, katman case 0 ==
+El kontrolü: 2 grup, m_u = 5. Büyük grup l = 4, küçük grup l = 0 -> G = 4, Δ = 0 ve 4
+m_u = 5, B_global = 9, G = 4  (g'nin ölçeği 2^G)
+-- grup 0: M = 300, B = 9, l = 4, Δ = 0
+     g32  g8 LMS   g8   g32/2^G     w  w - g8
+     300      18   18    18.750    10      -8
+    -200     -13  -13   -12.500   -10       3
+      50       3    3     3.125     0      -3
+-- grup 1: M = 31, B = 5, l = 0, Δ = 4
+     g32  g8 LMS   g8   g32/2^G     w  w - g8
+      31      31    1     1.938     5       4
+     -20     -20   -1    -1.250   100     101
+      17      17    1     1.062  -100    -101
+
+== Doyma örneği (katman case 6) ==
+Doyma: w = 127 ve g < 0, w = -127 ve g > 0 (±127'ye doyar); m_u = 5, G = 10
+  g32 =  -30000 -> g8 =  -29;  w =  127 -> w - g8 =  156 -> doyma ->  127
+  g32 =   30000 -> g8 =   29;  w = -127 -> w - g8 = -156 -> doyma -> -127
+  g32 =  -15000 -> g8 =  -14;  w =  120 -> w - g8 =  134 -> doyma ->  127
+  g32 =   15000 -> g8 =   14;  w = -120 -> w - g8 = -134 -> doyma -> -127

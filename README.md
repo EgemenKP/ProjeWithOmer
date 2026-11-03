@@ -7,6 +7,14 @@ KNK DEVIATIONS VE TASKS BURAYA
 - **Kapsam dışı:** Pooling (D39).
 - **Sırada (Adım 5):** 16×16 PE dizisi, çok bankalı tamponlar, boru hattı.
 
+## `final/` (03.11.2026 akşamı, Adım 5'in tabanı)
+Güncel tasarım `final/` altında. Eski `rtl/` ve `models/` karşılaştırma için değişmeden duruyor.
+- **Tek PE (D69):** `final/rtl/pe/pe_birlesik.v`. Shao Fig. 2'deki gibi 9 MAC ile 6 mod; eski sarmalayıcı 5 devre ve 45 MAC'ti. Sentezde LUT 5127 → 1445.
+- **Tek SRU (D70):** `final/rtl/sru/` (hedef girişi + 64 grup). `rtl/sru_hedefli/` ve `rtl/sru_64/` kopyaları `final/`'de yok.
+- **Düzeltmeler:** D68 (`stochastic_round` latch), D71 (LMS'te |−2^31|).
+- **Yeni `run_sim.tcl`'ler:** `final/rtl/pe/`, `final/rtl/sru/`, `final/rtl/clu/`.
+- **Doğrulama:** `final/rtl/` altındaki beş `run_sim.tcl` (sistem, pe, sru, clu, fe) Vivado'da gerçek bölücü IP'siyle PASS (04.11).
+
 Kararlar ve makaleden sapmalar: `DEVIATIONS.md`
 
 ## Klasörler

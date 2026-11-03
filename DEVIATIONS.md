@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D69**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D72**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -46,6 +46,9 @@ tercihi), `[Varsayım]` (geçici, netleşmemiş).
 | Fonksiyon motoru üst modülü (`fe_top`: ReLU + WU + CLU) | Tamamlandı (D62) | 456.144/456.144, Vivado'da gerçek bölücü IP'siyle doğrulandı (03.11) | `rtl/fe/fe_top.v`; bölücü IP'si `rtl/clu/ip/div_gen_0Z.xci` (Ömer) |
 | Komut yürütücüsü + PE motoru (ön-getirme, grup toplayıcı) + GMS FIFO + test belleği (Adım 4, Paket 2) | Tamamlandı (D66, D67) | 71.048/71.048 (ag1 ve ag2'nin bir eğitim adımı, FSM'in komut dosyasıyla), Vivado'da gerçek bölücü IP'siyle doğrulandı (03.11) | `rtl/sistem/`, `models/sistem/` |
 | Tam sistem entegrasyonu (Adım 4, Paket 3: `sistem_ust` = FSM + veri yolu; `maks_reg` çıktı, A1) | Tamamlandı | 21.415/21.415 (3 tur: ag1, ag2, ag1, arada reset yok; komutları FSM üretiyor), Vivado'da gerçek bölücü IP'siyle doğrulandı (03.11) | `rtl/sistem/` (`sistem_ust.v`, `tb_sistem.sv`, `run_sim.tcl`) |
+| **`final/`: tek PE, 9 MAC (D69)** | Tamamlandı; sistemde sarmalayıcının yerinde | 80.357/80.357 eskiye karşı; Egemen'in PE testleri 176/176 (eski ve yeni PE); sistem testlerinin hepsi aynı sayılarla PASS. Vivado'da gerçek bölücü IP'siyle doğrulandı (Ego, 04.11) | `final/rtl/pe/pe_birlesik.v` |
+| **`final/`: tek SRU (D70) + D68 + D71** | Tamamlandı | SRU testleri hepsi PASS, `tb_lms_uc` 20.013/20.013; Vivado'da doğrulandı (Ego, 04.11) | `final/rtl/sru/` |
+| **`final/`: `run_sim.tcl` (sistem, pe, sru, clu, fe)** | Tamamlandı | Beşi de Vivado'da gerçek bölücü IP'siyle PASS (Ego, 04.11); `tb_sru_gradyan` yalnızca `sru` script'inde (aşağıda 04.11 notu) | `final/rtl/*/run_sim.tcl` |
 
 ---
 
@@ -674,6 +677,79 @@ Ayrıntılı tasarım: Adım 4 tasarım belgesi `rtl/sistem/TASARIM_FSM.md` (T m
   raporunu ve zamanlama analizini kirletebilir.
 - **Öneri:** Bloğun başında `top = 0; bot = 0;` atanması. Dosyaya dokunulmadı; karar Egemen'in.
 - **Durum:** Açık.
+- **03.11 (akşam): KAPANDI, `final/`'de.** Egemen'in kararıyla öneri uygulandı (`final/rtl/sru/stochastic_round.v`,
+  2 satır). `[Ölçüldü]` Bütün SRU testleri aynen geçiyor (154, 12, 2297, 12, 52, 52, gradyan 1865).
+  Vivado 2026.1 sentezi (OOC, xc7vx690t) eski ve yeni dosyada 0 latch, aynı LUT sayısı veriyor: latch
+  yalnızca Yosys'te görülüyordu, Vivado kullanılmayan değeri zaten atıyor. Düzeltme yine de kalıyor
+  (kod her araçta temiz).
+
+---
+
+## Adım 5 öncesi düzeltmeler — `final/` klasörü (03.11.2026, akşam)
+
+Ego'nun kararı: projenin kalanı Ego + Claude. Mevcut `rtl/` ve `models/` `final/` altına kopyalandı;
+değişiklikler yalnızca `final/`'de, eski düzen karşılaştırma için değişmeden duruyor. Doğrulama:
+Claude Vivado 2026.1 XSIM'i komut satırından (xvlog/xelab/xsim, davranışsal bölücü) çalıştırdı; gerçek
+bölücü IP'li `run_sim.tcl` koşusu Ego'da (Claude'un başlattığı batch Vivado'da `launch_simulation`
+"Spawn failed" veriyor).
+
+### D69 — Tek PE: Shao Fig. 2'nin 9 MAC'i, 6 mod (`final/rtl/pe/pe_birlesik.v`)
+- **Ne:** Sistemdeki PE, Egemen'in beş ayrı devresini (45 MAC) seçen `pe_sarmalayici` yerine 9 MAC'lik
+  tek bir yeniden yapılandırılabilir PE. Portları sarmalayıcıyla aynı; `pe_motoru.v`'de yalnızca modül
+  adı değişti. `mac.v` değişmedi.
+- **Kanıt:** `[PDF tam]` Shao III-A (s. 256): "nine multiply-accumulate units (MACs), several
+  multiplexers, and a partial sum (Psum) FIFO queue". `[PDF şekil]` Fig. 2: MAC'in dış portları
+  1 = Weights/Errors, 2 = Activations/Errors; iç portları 3 = Partial sum, 4 = Passed value/0,
+  5 = Accumulated value; satır sonlarında iki toplayıcı ve Psum FIFO'ya giden mux'lar.
+- **Eşleme (Fig. 2 yorumu, `[Çıkarım]`):** port 3 yalnızca zincir başlarında Psum FIFO'dan (FP/BP s1:
+  r0c0; BP s2: A/B zincirlerinin satır 0-1 başları); port 4 soldaki MAC'in sonucu ya da 0 (satır 1-2
+  başları, BP s2'nin B zinciri); port 5 WG akümülatörü. WG'de port 1 = hata (c çevrim gecikmeli),
+  port 2 = aktivasyon (Egemen'in WG devrelerinde tersiydi; çarpım aynı). Çıkışta iki toplayıcı:
+  FP/BP s1 `(m02 + m12) + m22`, BP s2 `m01 + m21` ve `m02 + m22`.
+- **Fark (`[Çıkarım]`):** zincir, mavi D ve hata gecikme register'ları modlar arasında ortak. Mod
+  değişince önceki modun değerleri en çok 3 çevrimde 0 akışla temizleniyor; PE motoru her komuttan önce
+  en az 4 çevrim 0 akış veriyor (D_AGIRLIK + D_SATIR). WG akümülatörleri boşta (mod 6/7) korunur ama
+  başka bir modda çalışılınca bozulur; PE motoru bir WG işinin komutları arasına başka mod koymuyor (D47).
+- **Kanıt:** `[Ölçüldü]`
+  - `tb_pe_birlesik` (yeni): eski sarmalayıcıya karşı adım adım, PE motorunun komut düzeniyle; 3000
+    komut, 6 mod, 1255 mod geçişi: 80.357/80.357. Bilerek sokulan 5 hatanın 5'i yakalandı.
+  - Egemen'in PE testbench'leri değişmeden, `pe_birlesik_kabuklar.sv` üzerinden: 38+38+34+24+32+5+5.
+  - Sistem: `tb_veriyolu` 71.048/71.048 (PE girişleri ve çıkışları golden izine karşı çevrim çevrim),
+    `tb_sistem` 21.415/21.415, `tb_pe_blok` 380.490, `tb_fsm` 6206, `tb_sru_buyuk` 8508.
+  - Sentez (Vivado 2026.1, OOC, xc7vx690t): eski sarmalayıcı LUT 5127 / FF 1366, birleşik PE LUT 1445 /
+    FF 360; ikisinde de DSP 0 (8×8 çarpımlar LUT'a eşleniyor), latch 0. Zamanlama analizi yapılmadı.
+- **Durum:** Claude, 03.11, `final/`. Egemen'in beş devresi referans olarak duruyor (`tb_pe_blok`,
+  `tb_pe_birlesik`). 16×16 dizi (Adım 5) bu PE'den kurulacak.
+
+### D70 — Tek SRU: `rtl/sru_hedefli/` ve `rtl/sru_64/` kopyaları `final/rtl/sru/`'da birleşti
+- **Ne:** D61 (hedef girişi) ve D63 (64 grup, 7 bitlik sayaçlar) kopyalarının son hâli
+  (`rtl/sru_64/`) `final/rtl/sru/`'ya taşındı; iki kopya klasörü `final/`'de yok. Egemen'in değişmeyen
+  alt blokları (`bit_length32`, `gms_group16`, `stochastic_round`) aynı klasörde. Egemen'in SRU
+  testbench'lerine yalnızca `.hedef(3'd7)` bağlandı; `tb_sru_gradyan` `rtl/sru/`'ya taşındı.
+- **Neden:** Aynı modül adlarıyla üç klasör aynı projeye eklenemiyordu (D61, D63 notları); Adım 5'te
+  16 kanal (`sru_array`) hedef girişi ve 64 grupla gerekiyor. `[Çıkarım]`
+- **Kanıt:** `[Ölçüldü]` Egemen'in altı SRU testi (154, 12, 2297, 12, 52, 52), `tb_sru_gradyan` 1865,
+  `tb_sru_buyuk` 8508, sistem testleri: hepsi PASS.
+- **Durum:** Claude, 03.11, `final/`.
+
+### D71 — LMS'te |−2^31|: mutlak değerler 33 bitle karşılaştırılıyor (araç tuzağı 9'u kapatır)
+- **Ne:** `final/rtl/sru/lms_group16.v`: mutlak değerler `{1'b0, |x|}` olarak 33 bitlik işaretli
+  `max_tree`'ye veriliyor. 32 bitte |−2^31| = 2^31 negatif görünüyordu.
+- **Kanıt:** `[Ölçüldü]` Yeni `tb_lms_uc` (uç gruplar + 20.000 rastgele grup, hedef 1..7): yeni LMS
+  20.013/20.013; eski LMS aynı testte [−2^31, 5] için B = 3 (doğrusu 32), [−2^31] için B = 0 veriyor.
+  Diğer bütün SRU testleri değişmedi. `global_max_reducer16` yalnızca 6 bitlik pozitif B'leri
+  karşılaştırdığı için etkilenmiyor.
+- **Durum:** Claude, 03.11, `final/`. PE çıktıları pratikte −2^31'e ulaşmaz; düzeltme doğruluk için.
+
+### 04.11 notu — `final/` Vivado koşusu (gerçek bölücü IP'si, Ego)
+- `[Ölçüldü]` sistem: fsm 6206, sru_buyuk 8508, pe_blok 380.490, pe_birlesik 80.357, veriyolu 71.048,
+  sistem 21.415. pe: ASIL ve BIRLESIK 38+38+34+24+32+5+5 = 176/176 (D69'daki "138" yanlış toplamdı).
+  sru: 154, 12, 2297, 12, 52, 52, lms_uc 20.013, gradyan 1865. clu 40/40. fe: relu 196.608, wu 65.536,
+  fe_top 456.144. Hepsi PASS.
+- `tb_sru_gradyan` `fe/run_sim.tcl`'den çıkarıldı (D70 ile `rtl/sru/`'ya taşınmıştı, `sru` script'inde
+  geçiyor). fe script'inin tek `sim_1` fileset'inde `launch_simulation` "failed due to earlier errors"
+  verdi; log'larda ERROR yoktu, kök neden bulunamadı. Aynı dosya setiyle komut satırında xsim 1865/1865.
+  Tasarım değişikliği değil, test düzeni.
 
 ---
 
@@ -738,9 +814,16 @@ Ayrıntılı tasarım: Adım 4 tasarım belgesi `rtl/sistem/TASARIM_FSM.md` (T m
    görünür.** Örnek: `lms_group16.v`'de mutlak değerler işaretli `max_tree`'ye
    gidiyor; [−2^31, 5] grubunda B = 3 çıkıyor, 32 olmalı `[Ölçüldü]`. Çözüm:
    mutlak değerleri işaretsiz karşılaştır. PE çıktıları pratikte bu değere
-   ulaşmaz, düşük öncelikli.
+   ulaşmaz, düşük öncelikli. **`final/`'de düzeltildi (D71).**
 10. **XSIM, geniş bir task girişine doğrudan verilen karşılaştırma ifadesini bozuk
    değerlendirebiliyor.** Örnek: `tb_pe_blok`'ta `kontrol_et(f_bos, (k_say == 0), ...)`,
    288 bitlik girişte Icarus'ta doğru, Vivado XSIM'de anlamsız bir değer (`1b13...XXXz...`)
    verdi; DUT doğruydu `[Ölçüldü, 03.11]`. Çözüm: beklenen değeri önce bir değişkene ata,
    task'a değişkeni ver.
+11. **XSIM (`xvlog`) UTF-8 BOM'lu kaynak dosyayı reddediyor** (`unexpected non-printable
+   character with the hex value '0xef'`). Windows PowerShell 5.1'in `Set-Content -Encoding utf8`'i
+   BOM ekler. Çözüm: dosyaları BOM'suz UTF-8 yaz (`[IO.File]::WriteAllText(..., UTF8Encoding($false))`)
+   `[Ölçüldü, 03.11]`.
+12. **Komut satırından `xsim.bat ... -testplusarg AD=deger` verilince `=` argümanı bölüyor** (cmd'nin
+   `.bat` argüman ayrıştırması). Vivado GUI/Tcl'deki `xsim.simulate.xsim.more_options` yolu etkilenmez.
+   Çözüm: komut satırında vektörleri çalışma klasörüne kopyala (testbench'lerin yedek yolu, tuzak 7).

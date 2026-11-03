@@ -1,0 +1,7 @@
+vivado_sim*/
+.Xil/
+*.jou
+*.log
+*.str
+xsim.dir/
+project_*.gen/
