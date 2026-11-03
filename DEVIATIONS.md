@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D87**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D90**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -937,6 +937,45 @@ belgede. Özet:
 - **Vektörler:** `adim5_vektorleri/` (ve `ag2/`): `komutlar_dizi.txt`, `bolgeler.txt`, `veri_baslangic.txt`,
   `veri_beklenen.txt`, `agirlik_baslangic.txt`, `agirlik_beklenen.txt`.
 - **Durum:** Claude, 04.11.
+
+---
+
+## Adım 6 — CIFAR-10 deneyi (Shao Fig. 9'un karşılığı, 04.11.2026)
+
+Shao IV (s. 258): VGG16 benzeri ağ CIFAR-10'da eğitiliyor, test hata eğrisi NITI ile karşılaştırılıyor (Fig. 9);
+eğitimin FPGA'da mı yazılım modelinde mi yapıldığı metinde yazmıyor. NITI kodu ve makalesi bu bölümde hakem
+(Shao ağın ayrıntısını ve eğitim ayarlarını vermiyor). NITI kaynakları okundu: `ti_vgg.py`, `main.py`, `options.py`,
+`data.py`, `ti_net.py`, `ti_torch.py`, `train_vgg_cifar10.sh`; NITI makalesi §4.3, Tablo 5–6.
+
+### D87 — VGG16 benzeri ağın tanımı
+- **Ne:** VGG16 (CIFAR): 64,64,M,128,128,M,256×3,M,512×3,M,512×3,M + FC. Her "M + ardından gelen s1 conv" bir s2 conv
+  olur: conv64, conv64, conv128/s2, conv128, conv256/s2, conv256, conv256, conv512/s2, conv512, conv512, conv512/s2,
+  conv512, conv512, maxpool (2×2 → 1×1), FC 512 → 10. Bütün conv 3×3, dolgu 1, ReLU'lu; FC'den sonra ReLU yok.
+- **Kanıt:** `[PDF tam]` Shao IV: "replace the max-pooling layer and its subsequent convolutional layer (stride=1)
+  with a convolutional layer (stride=2)". Son max-pool'un ardından conv yok; onu bıraktım: Fig. 8'in fonksiyon
+  motorunda "Pooling" birimi var `[PDF şekil]`. FC başlığı (tek FC) `[NITI GitHub]` `ti_vgg.py`. NITI'nin FC öncesi
+  dropout'u alınmadı: Shao'nun donanımında dropout birimi yok. `[Çıkarım]`
+- **Fig. 9'un "VGG16" eğrisi:** aynı ağın max-pool'lu hâli (`vgg16`); NITI'nin deposunda VGG16 yok (yalnızca
+  VGG-small-7/8/9, NITI makalesi Tablo 5), Shao'nun NITI ile eğittiği VGG16'nın tanımını vermiyor.
+
+### D88 — Eğitim ayarları NITI'den
+- **Ne:** batch 256, 200 epoch, m_u 5 → 4 (100. epoch) → 3 (150. epoch), ağırlık başlatma xavier-uniform →
+  `weight_quant` (round(W / max|W| · 127), s_w = ⌈log2 max|W|⌉ − 7), giriş `TiFloatToInt8` (batch başına,
+  −128..127, D23), veri çoğaltma: 4 piksel dolgulu rastgele kırpma + yatay çevirme + normalizasyon. Öğrenme oranı
+  yok (w − g, D41). Float referans: SGD momentum 0.9, lr 0.01 → 0.001 → 0.0001 (100., 150. epoch).
+- **Kanıt:** `[NITI GitHub]` `ti_vgg.py` (regime), `options.py` (batch 256, epoch 200), `data.py`, `ti_torch.py`;
+  `[PDF tam]` NITI §4.3 (s. 3255).
+
+### D89 — Hızlı model (`final/models/cifar/hizli_model.py`)
+- **Ne:** Dizi golden'ının tensör düzeyinin (II') GPU'daki kopyası: konvolüsyonlar im2col + `torch._int_mm`
+  (int8 × int8 → int32 birikim, PE'nin MAC'i gibi taşmada sarar), SRU (D76 grupları, Alg. 1, doymasız), CLU yer
+  tutucusu, ReLU-geri maskesi (D86), WU (D41). Max-pool (FP: en büyük, BP: hata en büyüğün konumuna) ve FC (çıktı
+  grupları 16 sınıf, gradyan grupları 16 çıkış) golden'da yok, bu dosyada eklendi.
+- **Kanıt:** `[Ölçüldü]` `kontrol_hizli.py`: ag1, ag2 ve 16'dan fazla kanallı (2–3 karolu) 4 rastgele ağda bir
+  eğitim adımı golden'la bit bit aynı (aktivasyonlar, hatalar, son ağırlıklar, s_a, iş başına G).
+- **Bilinen sınır:** WG birikimi int32'de; 32×32 haritada batch 256 en kötü durumda taşabilir (D21: batch ≤ 130).
+  Donanım da int32 biriktirdiği için taşma aynı şekilde sarar; NITI de int32 biriktiriyor.
+- **Süre:** RTX 3060 Laptop'ta VGG16 benzeri, int: 1,65 s/adım (200 epoch ≈ 18 saat); float: 0,16 s/adım.
 
 ---
 
