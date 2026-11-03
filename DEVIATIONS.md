@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D80**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D87**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -901,6 +901,42 @@ dizi için yeni FSM komutları, tam sistem testi). NITI'nin kaynak kodu bu karar
   input data in an appropriate manner according to the computation patterns". Örtüşen satırların bankalara
   nasıl yerleştiği metinde yok. `[Çıkarım]`
 - **Durum:** Ego, 04.11. Uygulama 5b-3'te.
+
+### D80–D86 — Dizili sistemin tampon, ön-getirme ve komut kararları (Ego onayı, 04.11)
+Ayrıntı ve gerekçeler: `final/rtl/dizi/TASARIM_DIZI.md` (§2–§7). Hepsi `[Çıkarım]`; Shao'nun dayanak cümleleri
+belgede. Özet:
+- **D80:** Fig. 8'in giriş ve çıkış tamponları aynı çok bankalı veri tamponunun okuma (ön-getirme) ve yazma
+  (SRU) yüzleri; bölgeler AKT[0..L], HATA[1..L], GRAD[1..L]. Ayrı tamponlar katmanlar arası kopya isterdi,
+  Shao kopyayı yazmıyor.
+- **D81:** Kelime = bir grup (D76: bir konumdaki 16 kanal) + grubun l'si (Fig. 6'nın Max Regs'i kelimenin
+  yanında). Bank = satır mod 16 (D79); FP/BP s1'de SRU i doğrudan bank i'ye yazar. Bölgenin G'si ayrı register.
+- **D82:** Ağırlık bankı = o mod 16, kelime = w[o][c] (9 bayt). FP'de 1, BP'de 16 çevrimlik yükleme.
+- **D83:** Tam sistemde `sru_channel`'ın GMS tamponu kullanılmaz: satır sonunda `lms_group16` + paylaşılan
+  `global_max_reducer16`, LMS çıkışı (ReLU/ReLU-geri ile) doğrudan tampona; GMS ön-getirmede (D78). Shao'nun
+  "Both two stages ... implemented by this unit" cümlesiyle Fig. 8 arasındaki gerilim belgede (§4, §10) açık
+  soru olarak duruyor. BP s2'de bank çakışması: şerit adımı iki yarıda yazılır.
+- **D84:** Ön-getirmede satır register'ları (W + 2p ≤ 18) ve bank başına `gms_group16`; dolgu, çift/tek ayırma,
+  BP s2 sıfır ekleme akışa geçerken (D66'nın zamanlaması).
+- **D85:** Komut seti: KOPYA yok; DİZİ geçiş komutu (faz, l, b, x = k0 karosu, y = k1, z = satır karosu / WG'de
+  satır, ilk, son); WU komutu (l, o karosu, c) 9 kelime. Döngüler: FP o-karo → c → b → r-karo; BP c-karo → o →
+  b → m/p-karo; WG c-karo → o-karo → b → r.
+- **D86:** BP'nin ReLU-geri maskesi AKT[l−1]'in GMS'ten geçmiş değerinden (GMS küçük pozitif değeri 0'a
+  yuvarlayabilir). D53 ile birlikte, LMS çıkışında uygulanan ReLU/ReLU-geri ile Adım 4'ün "önce GMS" sırası aynı
+  sonucu verir. `[Ölçüldü]` Maske olarak kullanılan aktivasyonlardan ag1'de 464'ün 7'sinde, ag2'de 462'nin
+  4'ünde ham LMS değeriyle GMS'li değerin işareti farklı (pozitif → 0): maske ham değerden alınsa sonuç değişirdi.
+
+### Adım 5b-3a — Dizili sistemin golden'ı (`dizi_sistem_golden.py`)
+- **Ne:** D85'in komut listesi + (III'') tampon modelli komut yorumlayıcı: veri tamponu (16 bank, kelime = 16
+  kanal + l, D80/D81), bölge G'leri, ağırlık tamponu (D82), GMS'li ön-getirme (D78, D84), LMS'in ReLU/ReLU-geri
+  ile doğrudan yazılması (D83, D86), WU.
+- **Kanıt:** `[Ölçüldü]` Tamponun son hâli çözülünce `dizi_golden.py`'nin tensör düzeyiyle (II') bit bit aynı:
+  aktivasyonlar, hatalar, son ağırlıklar, s_a ve iş başına G + grup olayları (M, l, Δ), ag1 ve ag2. Bu,
+  D53/D86'nın (ReLU'yu LMS çıkışında uygulamak = Adım 4'ün "önce GMS"i) uçtan uca kontrolü.
+- **Sayılar:** ag1 102 komut (Adım 4'te 1186: dizi geçişleri 944 PE komutunun yerine 70 DİZİ; KOPYA yok), ag2
+  150 komut. Veri tamponu ag1'de 424 kelime (bank başına 85 adres), ağırlık 64 kelime.
+- **Vektörler:** `adim5_vektorleri/` (ve `ag2/`): `komutlar_dizi.txt`, `bolgeler.txt`, `veri_baslangic.txt`,
+  `veri_beklenen.txt`, `agirlik_baslangic.txt`, `agirlik_beklenen.txt`.
+- **Durum:** Claude, 04.11.
 
 ---
 
