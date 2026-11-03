@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D72**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D76**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -750,6 +750,85 @@ bölücü IP'li `run_sim.tcl` koşusu Ego'da (Claude'un başlattığı batch Viv
   geçiyor). fe script'inin tek `sim_1` fileset'inde `launch_simulation` "failed due to earlier errors"
   verdi; log'larda ERROR yoktu, kök neden bulunamadı. Aynı dosya setiyle komut satırında xsim 1865/1865.
   Tasarım değişikliği değil, test düzeni.
+
+---
+
+## Adım 5 kararları — 16×16 PE dizisi (04.11.2026, `final/`)
+
+Ego'nun talimatı: tercihler makaleye sadık seçilsin, şekiller tek başına değil Shao'nun metniyle
+birlikte yorumlansın. Kaynaklar: III-A (s. 256), III-B (s. 257), III-D, Fig. 8 ve Table I (s. 258).
+
+**D30 Fig. 8'le teyit edildi (yeni madde değil):** Fig. 8'de her PE satırının çıkışları (yeşil)
+satırın sonundaki tek bir SRU'ya giriyor; 16 satır, 16 SRU, hepsi çıkış tamponuna yazıyor. III-D:
+"The outputs of PE array are scaled and rounded by SRU before transmitted to the output buffer."
+Grup = bir satırın 16 PE çıkışı (sütunlar farklı çıkış kanalları), tek paylaşılan G (Fig. 6).
+
+### D72 — FP ve BP'de PE satırlarına çıkış satırı (row), sütunlara çıkış kanalı açılır
+- **Ne:** Satır r'deki PE'ler çıkış haritasının r. satırını, sütun c'dekiler c. çıkış kanalını
+  hesaplar. Satır r'nin 16 PE'si aynı 3 giriş satırını, sütun c'nin 16 PE'si c kanalının 9
+  ağırlığını alır.
+- **Kanıt:** `[PDF tam]` III-D (s. 258): "each row shares the same input and each column shares the
+  same weight"; "Inputs are unrolled along the batch or row dimensions for different PE rows,
+  meanwhile, weights are unrolled along the output channel dimension for different PE columns."
+  `[PDF şekil]` Fig. 8: giriş tamponunun her bankası bir satıra (mavi, yatay), ağırlık tamponunun
+  her bankası bir sütuna (kırmızı, dikey). III-A + Fig. 3: bir PE 3 giriş satırından bir çıkış
+  satırı üretiyor.
+- **Seçim:** Metindeki iki seçenekten (batch ya da row) "row". Test ağlarında batch 2–3; batch
+  açılımı 16 satırın 13–14'ünü boş bırakırdı. Sapma değil, metindeki seçeneklerden biri. `[Çıkarım]`
+- **Durum:** Claude, Ego'nun onayıyla, 04.11. Dizi modülü (`pe_dizi.v`) açılımdan bağımsız; açılım
+  ön-getirmenin (5b) işi.
+
+### D73 — WG'de PE satırlarına giriş kanalı açılır (Shao'nun metni bu fazı çözmüyor) — AÇIK SORU
+- **Ne:** WG'de PE (r, c) giriş kanalı r ile çıkış kanalı c arasındaki 3×3 gradyanı kendi
+  akümülatörlerinde batch ve konum üzerinden tam biriktirir. Satıra r kanalının aktivasyonu,
+  sütun boyunca c kanalının hatası gelir.
+- **Neden:** WG'de toplama batch ve konum üzerinden. Satırlara batch ya da row açılırsa her PE satırı
+  aynı gradyanın bir parçasını hesaplar ve parçaların satırlar arasında toplanması gerekir; Fig. 8'de
+  satırlar arası toplayıcı yok. Parçaları satırların ayrı SRU'larından geçirmek de olmaz (farklı ölçek).
+- **Kanıt:** `[PDF tam]` III-A: WG output-stationary. `[PDF şekil]` Fig. 2: port 1 "Weights/Errors"
+  (WG'de hata), port 5 akümülatör; Fig. 8: satırlar arası toplayıcı yok. III-D'deki "batch or row"
+  cümlesi FP/BP için yazılmış sayıldı; bu bir yorum. `[Çıkarım]`
+- **Not:** Fig. 8'de sütunlara giden hat ağırlık tamponundan geliyor; WG'de hatanın hangi tampondan
+  geleceği metinde yok. Shao'ya sorulabilir (D5'teki gibi).
+- **Durum:** Claude, Ego'nun onayıyla, 04.11. 5b'de ön-getirme ve golden'da uygulanacak.
+
+### D74 — Psum FIFO her PE'nin içinde; kayıt 128 bit (4 şerit), derinlik 64
+- **Ne:** `pe_dizi.v`'de her PE'nin kendi FIFO'su (`psum_fifo`, `GENISLIK = 128`). Bir kayıt PE'nin
+  bir çevrimlik çıkışı (`cikis_flat`): FP/BP s1'de yalnızca şerit 0, BP s2'de 4 şerit. Okumada BP
+  s2'nin B şeritleri (1, 3) bir çevrim gecikmeli verilir; tek PE'deki (D66) psA(t) = psum[t],
+  psB(t) = psum[t − 1] ile aynı. Kontroller (yaz, oku, seç, temizle) dizi geneli.
+- **Kanıt:** `[PDF tam]` III-A: PE "nine MACs, several multiplexers, and a partial sum (Psum) FIFO
+  queue" içeriyor. `[PDF şekil]` Fig. 2'de FIFO PE'nin içinde; Fig. 8'de PE dışında FIFO yok.
+  Adım 4'teki tek dış FIFO (D64 A6) tek PE içindi.
+- **Derinlik:** Hâlâ açık (D12). 64: satır açılımında (D72) PE başına bir kanal geçişi için batch × wo
+  kayıt (test ağında ≤ 3 × 16 = 48). `[Çıkarım]`
+- **Durum:** Claude, 04.11.
+
+### D75 — MAC'ler DSP'ye eşlenir (`use_dsp`)
+- **Ne:** `final/rtl/pe/mac.v` modülüne `(* use_dsp = "yes" *)`. Davranış aynı.
+- **Kanıt:** `[PDF tam]` IV + Table I (s. 258): 2324 DSP, "the MACs in PE array consume the most DSP";
+  256 × 9 = 2304 MAC. `[Ölçüldü]` Vivado 2026.1 OOC, xc7vx690t: `pe_birlesik` DSP 0 → 9, LUT 1445 →
+  723, FF 360 → 72 (MAC'in toplayıcısı ve register'ı da DSP'ye giriyor). DSP'siz 256 PE ≈ 370 bin LUT
+  olurdu (VC709: 433 bin).
+- **Durum:** Claude, 04.11.
+
+### Adım 5a — `pe_dizi.v` (16×16) ve testi
+- **Ne:** `final/rtl/dizi/pe_dizi.v`: 256 `pe_birlesik`, satır başına akış, sütun başına ağırlık,
+  PE içi Psum FIFO (D74). Grubun SRU'ya kurulması ve dizi kontrolü 5b'de.
+- **Kanıt:** `[Ölçüldü]` `tb_pe_dizi`: 256 ayrı `pe_birlesik` + testbench'te SV kuyruklarıyla yazılmış
+  FIFO/B gecikmesi referansına karşı, her satıra ve sütuna her çevrim farklı rastgele değer, 400
+  rastgele komut (6 mod, rastgele FIFO kontrolleri), her çevrim 256 PE'nin bütün çıkışları:
+  2.363.392/2.363.392 (XSIM CLI).
+- **Mutasyon:** `[Ölçüldü]` Bilerek sokulan 7 hatanın 7'si yakalandı (60 komutluk kısa testle): akış
+  satır yerine sütun indisiyle, ağırlık sütun yerine satır indisiyle, B gecikmesi yok, `ps_sec`
+  yok sayılıyor, BP s2 şeritleri yer değiştirmiş, FIFO'ya şerit 0 yazılmıyor, akis3 komşu satırdan.
+- **Sentez:** `[Ölçüldü]` Vivado 2026.1 OOC, xc7vx690t, `pe_dizi` 16×16: DSP 2304 (%64; Shao Table I
+  bütün sistem için 2324), LUT 243.689 (%56; 199.657 mantık + 44.032 LUTRAM, PE içi FIFO'lar), FF
+  27.808, BRAM 0, latch 0. Zamanlama analizi yapılmadı.
+- **Not (karşılaştırma):** Shao'nun bütün sistemi 171.248 LUT; bizim yalnızca dizimiz bunu aşıyor.
+  Muhtemel nedenler `[Çıkarım]`: PE'deki 6 modluk mux'lar (PE başına ~780 LUT) ve FIFO'ların LUTRAM'de
+  olması (Shao'nun 896 BRAM'i tamponlar için). FIFO'yu BRAM'e taşımak 5b'de değerlendirilebilir.
+- **Durum:** Claude, 04.11, `final/rtl/dizi/`. `dizi/run_sim.tcl` Vivado'da 2.363.392/2.363.392 PASS (Ego, 04.11).
 
 ---
 

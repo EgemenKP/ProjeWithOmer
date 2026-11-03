@@ -15,6 +15,12 @@ Güncel tasarım `final/` altında. Eski `rtl/` ve `models/` karşılaştırma i
 - **Yeni `run_sim.tcl`'ler:** `final/rtl/pe/`, `final/rtl/sru/`, `final/rtl/clu/`.
 - **Doğrulama:** `final/rtl/` altındaki beş `run_sim.tcl` (sistem, pe, sru, clu, fe) Vivado'da gerçek bölücü IP'siyle PASS (04.11).
 
+## Adım 5a: 16×16 PE dizisi (04.11.2026)
+- `final/rtl/dizi/pe_dizi.v`: 256 `pe_birlesik`; satır aynı girişi, sütun aynı ağırlığı paylaşıyor (Shao III-D, Fig. 8). Psum FIFO her PE'nin içinde (D74), MAC'ler DSP'de (D75).
+- Açılım kararları: FP/BP'de satırlara çıkış satırı (D72), WG'de giriş kanalı (D73, Shao'ya sorulabilecek açık soru).
+- Doğrulama: `tb_pe_dizi` 2.363.392/2.363.392 (XSIM CLI), 7 mutasyonun 7'si yakalandı. Sentez: DSP 2304, LUT 243.689.
+- Sırada (5b): grup kurulumu + 16 SRU bağlantısı, çok bankalı tamponlar, ön-getirme, dizi kontrolü, yeni golden.
+
 Kararlar ve makaleden sapmalar: `DEVIATIONS.md`
 
 ## Klasörler

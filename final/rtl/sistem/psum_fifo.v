@@ -21,15 +21,16 @@
 `timescale 1ns/1ps
 
 module psum_fifo #(
+    parameter GENISLIK = 32,       // kayıt genişliği (final/, 04.11: dizide PE başına 128, D74)
     parameter DERINLIK = 256,
     parameter AW       = 8          // DERINLIK = 2^AW
 ) (
     input  wire          clk,
     input  wire          rst,
     input  wire          yaz,
-    input  wire [31:0]   yaz_veri,
+    input  wire [GENISLIK-1:0] yaz_veri,
     input  wire          oku,
-    output wire [31:0]   bas_veri,
+    output wire [GENISLIK-1:0] bas_veri,
     output wire          bos,
     output wire          dolu,
     output reg  [AW:0]   doluluk,
@@ -37,7 +38,7 @@ module psum_fifo #(
     output reg           eksik
 );
 
-    reg [31:0]   mem [0:DERINLIK-1];
+    reg [GENISLIK-1:0] mem [0:DERINLIK-1];
     reg [AW-1:0] yaz_ptr, oku_ptr;
 
     assign bos      = (doluluk == {(AW+1){1'b0}});

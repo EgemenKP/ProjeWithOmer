@@ -18,9 +18,13 @@
 // fazlarina gore NE ZAMAN degistigi makalede yazmiyor -- Omer Faruk'un
 // golden model'i (Fig.3-5'teki 6 bağlanti semasini kodlayinca) netlesecek.
 // Simdilik duz bir 2-bit secim sinyaliyle disariya acik birakildi.
+//
+// final/ (04.11, Claude, D75): use_dsp ozniteligi eklendi. Shao Table I (s. 258): 2324 DSP,
+// "the MACs in PE array consume the most DSP"; 256 PE x 9 MAC = 2304. Davranis degismedi.
 // ============================================================================
 `timescale 1ns/1ps
 
+(* use_dsp = "yes" *)
 module mac (
     input  wire               clk,
     input  wire                rst,          // senkron, aktif-yuksek -- yalniz WG (akumulator) moduna gerekli, digerlerinde 0'a baglanir
