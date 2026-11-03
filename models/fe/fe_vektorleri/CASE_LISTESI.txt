@@ -1,0 +1,18 @@
+relu.hex      : 65536 satır, tüm (a, e) int8 çiftleri
+wu_cikarma.hex: 65536 satır, tüm (w, g8) int8 çiftleri
+wu_katman case 0: 2 grup, m_u = 5 — El kontrolü: 2 grup, m_u = 5. Büyük grup l = 4, küçük grup l = 0 -> G = 4, Δ = 0 ve 4
+wu_katman case 1: 2 grup, m_u = 1 — Aynı gradyan, m_u = 1: adım büyüklüğünü m_u belirler
+wu_katman case 2: 2 grup, m_u = 2 — Aynı gradyan, m_u = 2: adım büyüklüğünü m_u belirler
+wu_katman case 3: 2 grup, m_u = 3 — Aynı gradyan, m_u = 3: adım büyüklüğünü m_u belirler
+wu_katman case 4: 2 grup, m_u = 4 — Aynı gradyan, m_u = 4: adım büyüklüğünü m_u belirler
+wu_katman case 5: 2 grup, m_u = 5 — Aynı gradyan, m_u = 5: adım büyüklüğünü m_u belirler
+wu_katman case 6: 1 grup, m_u = 5 — Doyma: w = 127 ve g < 0, w = -127 ve g > 0 (±127'ye doyar)
+wu_katman case 7: 1 grup, m_u = 4 — Tek grup (Δ = 0)
+wu_katman case 8: 2 grup, m_u = 5 — Sıfır gradyan grubu (B = 0)
+wu_katman case 9: 1 grup, m_u = 5 — B <= m_u: kaydırma yok, g aynen geçer
+wu_katman case 10: 1 grup, m_u = 5 — Maksimum 2'nin kuvveti (1024): D28'de B = 11
+wu_katman case 11: 2 grup, m_u = 5 — int32 uçları
+wu_katman case 12: 4 grup, m_u = 4 — Rastgele: 4 grup x 16 değer, m_u = 4
+wu_katman case 13: 8 grup, m_u = 1 — Rastgele: 8 grup x 16 değer, m_u = 1
+wu_katman case 14: 16 grup, m_u = 2 — Rastgele: 16 grup x 16 değer, m_u = 2
+wu_katman case 15: 5 grup, m_u = 4 — Rastgele: 5 grup x 7 değer, m_u = 4

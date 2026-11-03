@@ -1,0 +1,27 @@
+CLU stokastik yuvarlama (D8 = c) — okunur döküm
+
+LFSR: 16 bit, x^16 + x^14 + x^13 + x^11 + 1, kullanım başına 4 adım; r = alt 4 bit
+Kanal tohumları (ondalık / hex):
+  kanal 0: 44257 / ACE1
+  kanal 1:  5742 / 166E
+  kanal 2: 18699 / 490B
+  kanal 3: 61957 / F205
+  kanal 4:  2661 / 0A65
+  kanal 5: 16187 / 3F3B
+  kanal 6: 58168 / E338
+  kanal 7: 23296 / 5B00
+  kanal 8: 41194 / A0EA
+  kanal 9: 56680 / DD68
+
+Kanal 0'ın ilk 8 kullanımı, x = 40 (40/16 = 2,5) ile:
+kullanım   LFSR   r   f   y
+       0   ACE1   1   8   3   (yukarı)
+       1   CE1E  14   8   2   (aşağı)
+       2   E1E4   4   8   3   (yukarı)
+       3   1E45   5   8   3   (yukarı)
+       4   E455   5   8   3   (yukarı)
+       5   455D  13   8   2   (aşağı)
+       6   55DD  13   8   2   (aşağı)
+       7   5DD1   1   8   3   (yukarı)
+
+f = 8 olduğu için yukarı yuvarlama olasılığı 8/16; uzun vadede ortalama 2,5.

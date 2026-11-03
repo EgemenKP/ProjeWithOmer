@@ -1,0 +1,51 @@
+Sistem golden modeli — özet
+
+Ağ: batch 2, m_u 5, s_a0 -7, 3 katman, başlangıç tohumu 4242
+katman  cin cout   giriş   çıkış  s  p relu  s_w
+     1    2    4 7x7     7x7      1  1    1   -8
+     2    4    4 7x7     3x3      2  0    1   -8
+     3    4   10 3x3     1x1      1  0    0   -8
+
+İşler (sırasıyla): faz, katman, PE geçişi, grup sayısı, B_global, G, hedef
+  FP katman 1: 112 PE geçişi, 56 grup, B_global 17, G 10 (hedef 7)
+  FP katman 2: 96 PE geçişi, 24 grup, B_global 15, G 8 (hedef 7)
+  FP katman 3: 80 PE geçişi, 20 grup, B_global 15, G 8 (hedef 7)
+  BP katman 3: 240 PE geçişi, 24 grup, B_global 15, G 8 (hedef 7)
+  WG katman 3: 80 PE geçişi, 40 grup, B_global 14, G 9 (hedef 5)
+  BP katman 2: 128 PE geçişi, 32 grup, B_global 15, G 8 (hedef 7)
+  WG katman 2: 96 PE geçişi, 16 grup, B_global 13, G 8 (hedef 5)
+  WG katman 1: 112 PE geçişi, 8 grup, B_global 15, G 10 (hedef 5)
+
+Komut sayıları: {'IS_BASLA': 8, 'PE': 944, 'OLCEK': 8, 'SA': 3, 'KOPYA': 156, 'CLU': 2, 'WU': 64, 'BITTI': 1}, toplam 1186
+Max Regs derinliği (bir işteki en çok grup): 56 x 32 bit
+Psum FIFO en çok doluluk: 128 int32
+Çıkış tamponu (CIK) en çok doluluk: 392 bayt
+maksreg.txt olay sayısı: 448
+s_a: [-7, -5, -5, -5]  (CLU s_a = -5)
+
+İlk 6 komut (op faz katman b x y z a1 a2 a3):
+    8   0   1   0   7   0   0   0   0   0   <- IS_BASLA
+    1   0   1   0   0   0   0   1   0  -1   <- PE
+    1   0   1   0   0   0   1   1   0  -1   <- PE
+    1   0   1   0   0   0   2   1   0  -1   <- PE
+    1   0   1   0   0   0   3   1   0  -1   <- PE
+    1   0   1   0   0   0   4   1   0  -1   <- PE
+
+T8 kontrolü: ReLU ile GMS'in sırası 49152 durumun hepsinde aynı sonucu verdi.
+
+Float kontrolü (III): int sonuçlar, aynı başlangıçtaki ondalıklı ağla karşılaştırıldı.
+ölçüm                                                    karar (D59)    doymalı ref.
+  FP katman 1: max |int - float| / max |float|                0.4023          0.0126
+  BP δ_1: kosinüs(int, float)                                 0.9746          0.9840
+  WG katman 1: kosinüs(int G32, float dW)                     0.9809          0.9894
+  FP katman 2: max |int - float| / max |float|                0.1849          0.0308
+  BP δ_2: kosinüs(int, float)                                 0.9867          0.9982
+  WG katman 2: kosinüs(int G32, float dW)                     0.9744          0.9968
+  FP katman 3: max |int - float| / max |float|                0.1646          0.0351
+  BP δ_3: kosinüs(int, float)                                 0.9962          0.9980
+  WG katman 3: kosinüs(int G32, float dW)                     0.9912          0.9976
+SRU'da 128'e ulaşan değer (bu adımda): {'LMS': 2, 'GMS': 0} — 8 bitte sarıldı (D59, makaledeki gibi)
+'karar' sütunu yazılan vektörlerin (beklenen_sonuc.txt) değerleri; yalnızca raporlanır.
+'doymalı ref.' sütunu sıkı eşiklerle denetlenir (FP sapması < 0,1, kosinüs > 0,95); doyma
+yalnızca bu karşılaştırma için açıldı. Doyma olmazsa taşan değer grubun en büyük değeridir
+ve işaret değiştirir.
