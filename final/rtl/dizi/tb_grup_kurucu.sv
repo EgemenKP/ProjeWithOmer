@@ -12,7 +12,14 @@
 // =============================================================================
 `timescale 1ns/1ps
 
+// Üst modülde hiç sinyal yok: Vivado GUI'nin başlatma script'i üst seviyede sinyal bulamayınca dalga
+// penceresi açmıyor. Bu testbench'in büyük register'ları ve SV kuyrukları dalga görünümünü çökertiyordu
+// (04.11, araç tuzağı 13). Testbench'in kendisi aşağıdaki tb_grup_kurucu_govde modülünde.
 module tb_grup_kurucu;
+    tb_grup_kurucu_govde govde ();
+endmodule
+
+module tb_grup_kurucu_govde;
 
     localparam R = 16, C = 16, N = R*C;
 

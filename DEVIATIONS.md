@@ -953,5 +953,7 @@ Grup = bir satırın 16 PE çıkışı (sütunlar farklı çıkış kanalları),
 13. **Vivado GUI'de `launch_simulation`, üst seviyedeki bütün sinyalleri dalga penceresine ekliyor; çok
    geniş register'lı (~100 bin bit) ve SV kuyruk dizili bir testbench'te GUI'nin dalga görünümü (Java)
    çöküyor** (`hs_err_pid*.log`: `WVExecutive_getGraphicsDataSize`, EXCEPTION_ACCESS_VIOLATION). Simülasyon
-   değil arayüz çöküyor; `tb_grup_kurucu`'da görüldü `[Ölçüldü, 04.11]`. Çözüm: simset'e yalnızca
-   `run all` içeren bir dosya ver (`xsim.simulate.custom_tcl`), dalga hiç açılmasın (`dizi/run_sim.tcl`).
+   değil arayüz çöküyor; `tb_grup_kurucu`'da görüldü `[Ölçüldü, 04.11]`. `xsim.simulate.custom_tcl` ayarı
+   batch'te kabul edildi ama GUI koşusunda kullanılmadı (yine `add_wave /`). Çözüm: testbench'i sinyalsiz
+   bir üst modülün içine koy (`module tb; tb_govde govde (); endmodule`); başlatma script'i üst seviyede
+   sinyal bulamayınca dalga açmıyor (`get_objects` = 0, `[Ölçüldü]`).
