@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D76**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D77**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -829,6 +829,35 @@ Grup = bir satırın 16 PE çıkışı (sütunlar farklı çıkış kanalları),
   Muhtemel nedenler `[Çıkarım]`: PE'deki 6 modluk mux'lar (PE başına ~780 LUT) ve FIFO'ların LUTRAM'de
   olması (Shao'nun 896 BRAM'i tamponlar için). FIFO'yu BRAM'e taşımak 5b'de değerlendirilebilir.
 - **Durum:** Claude, 04.11, `final/rtl/dizi/`. `dizi/run_sim.tcl` Vivado'da 2.363.392/2.363.392 PASS (Ego, 04.11).
+
+### D73 eki (04.11, 5b) — WG'de hata sütun hattından geliyor
+- **Ne:** D73'e göre PE (c, o) o kanalının hatasını almalı, yani hata sütuna göre değişir. 5a'daki
+  `pe_dizi.v` hatayı satır hattından veriyordu; düzeltildi: WG s1/s2'de PE'nin hata girişi (pe_birlesik'in
+  akis2/akis3'ü) sütun hattının alt 24 bitinden sürülüyor.
+- **Kanıt:** `[PDF şekil]` Fig. 2: port 1 "Weights/Errors" — aynı port FP/BP'de ağırlığı, WG'de hatayı
+  alıyor; Fig. 8'de bu port sütun hattına (kırmızı) bağlı. `[Ölçüldü]` `tb_pe_dizi`'nin referansı da
+  bağımsız olarak güncellendi: 2.363.392/2.363.392; eski bağlantı (hata satırdan) mutasyon olarak 55.808 hata verdi.
+
+### D76 — Dizide SRU grubu: bir PE satırının bir çevrimde verdiği, sütun başına bir değer (D30'u daraltır)
+- **Ne:** Satır i'nin grubu, sütunlardan birer değer (en çok 16):
+  - FP / BP: aynı (örnek, konum)daki en çok 16 kanal. BP s2'de dolguya düşen konumlar gruba girmez (D52).
+  - WG: aynı (giriş kanalı, ki, kj)deki en çok 16 çıkış kanalı (bir satırın 9 grubu).
+  Satır i'nin grupları i. SRU kanalına gider, G bütün kanallarda ortak (D30).
+- **Neden:** D30 "bir PE satırının bir geçişte ürettikleri" diyordu; tek PE'de (Adım 4) bu wo değerdi.
+  16×16'da bir satır bir geçişte 16 × wo değer üretiyor, ama Egemen'in SRU kanalı (`lms_group16`) en çok 16
+  değerlik grup alıyor. `[PDF şekil]` Fig. 8: satırın 16 PE çıkışı aynı anda satırın SRU'suna gidiyor.
+  `[PDF tam]` III-B: "a group of int32 output data, which is part of the full-layer outputs". Grubun
+  boyu metinde yok; 16 = satırın sütun sayısı = Egemen'in SRU genişliği. `[Çıkarım]`
+- **Sonucu:** LMS grup başına yuvarladığı için sonuçlar Adım 4'ün (tek PE) sayılarıyla aynı değil
+  `[Ölçüldü]`: ag1'de AKT1 %3, AKT2 %22, AKT3 %80 (son katman: Adım 4'te her sınıf ayrı grup, şimdi 10
+  sınıf tek grup), son ağırlıklar %32 farklı; ag2'de %1, %7, %23, %10. s_a'lar aynı.
+- **Kanıt (golden):** `[Ölçüldü]` `final/models/sistem/dizi_golden.py`:
+  - (I') dizi yorumlayıcı (geçiş geçiş, PE başına pe_golden çevrim modeli ve Psum FIFO, satır başına grup)
+    ile (II') tensör düzeyi (ref_fp/bp/wg + aynı grup tanımı) ag1 ve ag2'de bit bit aynı (8 iş, 324 grup).
+  - Float (doymalı referans, D65): FP sapması ≤ 0,047, kosinüs ≥ 0,968. Doymasız ag1'de 0,402 (D59, Adım
+    4'teki ile aynı).
+  - SRU kanalı başına bir işte en çok 30 grup (≤ 64, D63); PE başına Psum FIFO en çok 15 kayıt (≤ 64, D74).
+- **Durum:** Claude, 04.11, 5b. RTL'de grup kurulumu sıradaki adım.
 
 ---
 

@@ -4,7 +4,7 @@
 //  Referans: 256 ayrı pe_birlesik + testbench'te SystemVerilog kuyruklarıyla yazılmış Psum
 //  FIFO ve B şeridi gecikmesi. Referansın girişleri dizilerden (satır başına akış, sütun başına
 //  ağırlık) ayrı indislemeyle kuruluyor; dizinin satır/sütun bağlantısı, PE içi FIFO'ları ve
-//  BP s2'nin B gecikmesi böylece bağımsız denetleniyor. PE'nin aritmetiği zaten doğrulandı
+//  BP s2'nin B gecikmesi ve WG'de hatanın sütun hattından gelmesi (D73) böylece bağımsız denetleniyor. PE'nin aritmetiği zaten doğrulandı
 //  (D69: tb_pe_birlesik, Egemen'in PE testleri).
 //
 //  Uyaran: her komut rastgele mod (0..5), 0..3 boş çevrim, WG'de %50 rst, 3..40 akış çevrimi.
@@ -58,7 +58,9 @@ module tb_pe_dizi;
             for (gc = 0; gc < C; gc = gc + 1) begin : rc
                 pe_birlesik u_ref (
                     .clk(clk), .rst(rst), .mod(mod), .w_flat(rw[gc]),
-                    .akis1(ra1[gr]), .akis2(ra2[gr]), .akis3(ra3[gr]),
+                    .akis1(ra1[gr]),
+                    .akis2(mod == 3'd4 ? rw[gc][23:0] : ra2[gr]),   // WG s1: hata sütundan (D73)
+                    .akis3(mod == 3'd5 ? rw[gc][23:0] : ra3[gr]),   // WG s2: hata sütundan
                     .ps_flat(rps[gr][gc]), .cikis_flat(rcik[gr][gc]), .g_flat(rg[gr][gc])
                 );
             end

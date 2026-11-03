@@ -8,9 +8,11 @@
 //  SRU'ya gidiyor (D30).
 //
 //  - Her hücre bir pe_birlesik (D69, 9 MAC; MAC'ler DSP'de, D75).
-//  - Satır r'deki 16 PE aynı akis1/2/3'ü, sütun c'deki 16 PE aynı 9 ağırlığı alır. WG'de
-//    port 1 hata taşıdığı için (Fig. 2: "Weights/Errors") hata akışı da satır girişinden
-//    gelir (pe_birlesik'in akis2/akis3'ü); sütuna ne açılacağı ön-getirmenin işi (D72, D73).
+//  - Satır r'deki 16 PE aynı akis1/2/3'ü, sütun c'deki 16 PE aynı 9 ağırlığı alır (D72).
+//  - WG'de (D73: satır = giriş kanalı, sütun = çıkış kanalı) port 1 hatayı taşır (Fig. 2:
+//    "Weights/Errors"); hata, ağırlıkla aynı sütun hattından gelir: sütun c'nin hattının alt 24
+//    biti (3 iç satır x 8). pe_birlesik'te WG s1 hatayı akis2'den, WG s2 akis3'ten okuduğu için
+//    bu modlarda o giriş satır yerine sütun hattından sürülür (04.11, 5b).
 //  - Psum FIFO her PE'nin içinde (III-A, Fig. 2; D74). Kayıt = PE'nin 128 bitlik çıkışı
 //    (4 şerit; FP/BP s1'de yalnızca şerit 0 dolu). Okumada BP s2'nin B şeritleri (1, 3) bir
 //    çevrim gecikmeli verilir: pe_motoru'nda psB(t) = psum[t-1], psA(t) = psum[t] (D66).
@@ -22,7 +24,7 @@
 //    clk, rst       : saat; rst yalnızca WG'de PE akümülatörlerini sıfırlar (pe_birlesik)
 //    mod [2:0]      : pe_birlesik'teki gibi (0 FP s1 .. 5 WG s2, 6/7 boşta)
 //    satir_akis1/2/3_flat [R*24] : satır r'nin akisN'i [24r +: 24]
-//    sutun_w_flat   [C*72] : sütun c'nin 9 ağırlığı [72c +: 72]
+//    sutun_w_flat   [C*72] : sütun c'nin 9 ağırlığı [72c +: 72]; WG'de alt 24 bit hata akışı
 //    ps_temizle     : bütün Psum FIFO'larını boşaltır (İŞ_BAŞLA'da)
 //    ps_yaz         : her PE kendi cikis_flat'ını kendi FIFO'suna yazar
 //    ps_oku         : her PE kendi FIFO'sunun baştaki kaydını çıkarır
@@ -56,7 +58,7 @@ module pe_dizi #(
     output wire                 ps_eksik
 );
 
-    localparam BP_S2 = 3'd3;
+    localparam BP_S2 = 3'd3, WG_S1 = 3'd4, WG_S2 = 3'd5;
 
     wire [R*C-1:0] tasma_v, eksik_v;
     assign ps_tasma = |tasma_v;
@@ -90,12 +92,17 @@ module pe_dizi #(
                 wire [127:0] ps   = (mod == BP_S2) ? {b_gec[96 +: 32], a_ps[64 +: 32], b_gec[32 +: 32], a_ps[0 +: 32]}
                                                    : {96'd0, a_ps[0 +: 32]};
 
+                // WG'de hata sütun hattından (D73)
+                wire [23:0] sutun_e = sutun_w_flat[72*c +: 24];
+                wire [23:0] akis2   = (mod == WG_S1) ? sutun_e : satir_akis2_flat[24*r +: 24];
+                wire [23:0] akis3   = (mod == WG_S2) ? sutun_e : satir_akis3_flat[24*r +: 24];
+
                 pe_birlesik u_pe (
                     .clk(clk), .rst(rst), .mod(mod),
                     .w_flat(sutun_w_flat[72*c +: 72]),
                     .akis1(satir_akis1_flat[24*r +: 24]),
-                    .akis2(satir_akis2_flat[24*r +: 24]),
-                    .akis3(satir_akis3_flat[24*r +: 24]),
+                    .akis2(akis2),
+                    .akis3(akis3),
                     .ps_flat(ps),
                     .cikis_flat(cikis),
                     .g_flat(g_flat[288*I +: 288])
