@@ -162,6 +162,18 @@ class Dizi:
         self.fifo_en_cok = 0
         self.sru = [[] for _ in range(DR)]   # satır başına bu işin grupları: (anahtar, değerler)
         self.gecis = 0
+        self.kayitlar = []        # grup kurucunun girişleri (RTL testi için), bkz. kayit()
+
+    def kayit(self, mod, degerler, no, altlar):
+        """Grup kurucuya verilen bir kayıt: PE'lerin çıkışları ve onlardan kurulan gruplar.
+          degerler : (i, j) -> PE'nin şeritleri (4 int32) ya da WG'de 9 akümülatör
+          no       : dolu sütun sayısı (grubun boyu)
+          altlar   : [(seçim, {satır i: grup anahtarı})] — seçim: şerit (0..3) ya da akümülatör (0..8)
+        Satır i'nin grubu: degerler[(i, j)][seçim], j < no. Gruplar SRU'ya bu sırayla gider."""
+        self.kayitlar.append((mod, degerler, no, altlar))
+        for sec, satirlar in altlar:
+            for i, anahtar in satirlar.items():
+                self.sru[i].append((anahtar, [degerler[(i, j)][sec] for j in range(no)]))
 
     def yaz(self, ij, anahtar, kayit):
         """kayit: bir geçişin kısmi toplamları. RTL'de (D74) her çevrim bir kayıt (128 bit, 4 şerit):
@@ -205,13 +217,13 @@ def dizi_fp(D, k, AKT_l, Wl):
                         for j in range(no):
                             psum = [0] * k["wo"] if ilk else D.oku((i, j), (o0, b, r0))
                             cikis[(i, j)] = fp_pe(k, X, Wl[o0 + j][c], psum)
-                    for i in range(nr):
-                        if son:                          # satır i'nin grupları: x sırasıyla
-                            for x in range(k["wo"]):
-                                D.sru[i].append(((o0, b, r0 + i, x), [cikis[(i, j)][x] for j in range(no)]))
-                        else:
-                            for j in range(no):
-                                D.yaz((i, j), (o0, b, r0), cikis[(i, j)])
+                    if son:                              # her çıkış konumu x bir kayıt
+                        for x in range(k["wo"]):
+                            D.kayit(k["s"] - 1, {ij: [v[x], 0, 0, 0] for ij, v in cikis.items()}, no,
+                                    [(0, {i: (o0, b, r0 + i, x) for i in range(nr)})])
+                    else:
+                        for (i, j), v in cikis.items():
+                            D.yaz((i, j), (o0, b, r0), v)
 
 
 def dizi_bp(D, k, HATA_l, Wl):
@@ -232,13 +244,13 @@ def dizi_bp(D, k, HATA_l, Wl):
                                 psum = [0] * k["w"] if ilk else D.oku((i, j), (c0, b, m0))
                                 _, cik = PE.pe_gecis_s1(X, PE.dondur_180(Wl[o][c0 + j]), PE.ps_akisi_s(psum, T))
                                 cikis[(i, j)] = [d[0] for (_, d) in cik]
-                        for i in range(nm):
-                            if son:
-                                for x in range(k["w"]):
-                                    D.sru[i].append(((c0, b, m0 + i, x), [cikis[(i, j)][x] for j in range(nc)]))
-                            else:
-                                for j in range(nc):
-                                    D.yaz((i, j), (c0, b, m0), cikis[(i, j)])
+                        if son:
+                            for x in range(k["w"]):
+                                D.kayit(2, {ij: [v[x], 0, 0, 0] for ij, v in cikis.items()}, nc,
+                                        [(0, {i: (c0, b, m0 + i, x) for i in range(nm)})])
+                        else:
+                            for (i, j), v in cikis.items():
+                                D.yaz((i, j), (c0, b, m0), v)
         return
     He, We = k["ho"], k["wo"]
     n = We + 1
@@ -264,17 +276,21 @@ def dizi_bp(D, k, HATA_l, Wl):
                             psum4 = [[0] * n for _ in range(4)] if ilk else D.oku((i, j), (c0, b, p0))
                             _, cik = PE.pe_gecis_bp_s2(akislar, w_yuklu, PE.ps_akisi_bp_s2(psum4, T))
                             serit[(i, j)] = [[d[s_] for (_, d) in cik] for s_ in range(4)]
-                    for i in range(np_):
-                        p = p0 + i
-                        if son:                          # geçerli dX konumları (D52)
-                            for R in S.bp_s2_satirlari(k, p):
-                                for C in range(k["w"]):
-                                    C0 = C + k["p"]
-                                    s_ = (0 if R + k["p"] == 2 * p else 2) + (C0 % 2)
-                                    D.sru[i].append(((c0, b, R, C), [serit[(i, j)][s_][C0 // 2] for j in range(nc)]))
-                        else:
-                            for j in range(nc):
-                                D.yaz((i, j), (c0, b, p0), serit[(i, j)])
+                    if son:                              # her sütun çifti q bir kayıt, 4 şerit
+                        for q in range(n):
+                            altlar = []
+                            for s_ in range(4):          # şerit s: dX (2p + s//2, 2q + s%2) - dolgu
+                                satirlar = {}
+                                for i in range(np_):
+                                    R = 2 * (p0 + i) + s_ // 2 - k["p"]
+                                    C = 2 * q + s_ % 2 - k["p"]
+                                    if 0 <= R < k["h"] and 0 <= C < k["w"]:     # D52
+                                        satirlar[i] = (c0, b, R, C)
+                                altlar.append((s_, satirlar))
+                            D.kayit(3, {ij: [v[s_][q] for s_ in range(4)] for ij, v in serit.items()}, nc, altlar)
+                    else:
+                        for (i, j), v in serit.items():
+                            D.yaz((i, j), (c0, b, p0), v)
 
 
 def dizi_wg(D, k, AKT_l, HATA_l):
@@ -300,10 +316,9 @@ def dizi_wg(D, k, AKT_l, HATA_l):
                                 T = len(cift[0])
                                 PE.pe_gecis_wg_s2(list(cift), list(tek), [e_sat + [0] * (T - len(e_sat))] * 3,
                                                   D.akum[(i, j)])
-            for i in range(nc):
-                for ki in range(3):
-                    for kj in range(3):
-                        D.sru[i].append(((o0, c0 + i, ki, kj), [D.akum[(i, j)][ki][kj] for j in range(no)]))
+            D.kayit(3 + k["s"], {ij: PE.duzlestir(a) for ij, a in D.akum.items()}, no,
+                    [(3 * ki + kj, {i: (o0, c0 + i, ki, kj) for i in range(nc)})
+                     for ki in range(3) for kj in range(3)])
 
 
 def yorumla_dizi(AKT0, W0, etiket):
@@ -323,7 +338,8 @@ def yorumla_dizi(AKT0, W0, etiket):
         assert max(kanal_grup) <= SRU_MAKS_GRUP, (faz, l, kanal_grup)
         assert D.fifo_en_cok <= PS_DERINLIK, (faz, l, D.fifo_en_cok)
         G, cik, olay = sru_is([g for kanal in D.sru for g in kanal], hedef)
-        istat.append(dict(faz=faz, l=l, gecis=D.gecis, kanal_grup=kanal_grup, fifo=D.fifo_en_cok, G=G))
+        istat.append(dict(faz=faz, l=l, gecis=D.gecis, kanal_grup=kanal_grup, fifo=D.fifo_en_cok, G=G,
+                          hedef=hedef, kayitlar=D.kayitlar, cik=cik))
         return G, cik, olay
 
     for li, k in enumerate(K):                                   # ---- İleri
@@ -367,6 +383,37 @@ def yorumla_dizi(AKT0, W0, etiket):
 
 
 # ----------------------------------------------------------------------------
+# RTL vektörleri: grup kurucu + 16 SRU (dizi_grup.txt)
+# ----------------------------------------------------------------------------
+def grup_vektorleri_yaz(yol, istat):
+    """dizi_grup.txt — tb_grup_kurucu için. Bütün sayılar ondalık.
+      1. satır: iş sayısı
+      Her iş:  IS hedef G kayıt_sayısı
+        Her kayıt: K mod akum_mi nr no alt_sayısı
+                   nr*no satır: PE (i, j)'nin değerleri (i satır, j sütun sırasıyla; 4 şerit ya da 9 akümülatör)
+                   alt_sayısı satır: seçim satır_maskesi (bit i = satır i'nin grubu var)
+        Beklenen: 16 satır (SRU kanalı i): grup_sayısı, ardından her grup için no tane int8 (GMS çıkışı),
+                  grupların SRU'ya verildiği sırayla"""
+    with open(yol, "w") as f:
+        f.write(f"{len(istat)}\n")
+        for js in istat:
+            f.write(f"IS {js['hedef']} {js['G']} {len(js['kayitlar'])}\n")
+            beklenen = [[] for _ in range(DR)]
+            for mod, degerler, no, altlar in js["kayitlar"]:
+                nr = 1 + max(i for (i, _) in degerler)
+                f.write(f"K {mod} {int(mod >= 4)} {nr} {no} {len(altlar)}\n")
+                for i in range(nr):
+                    for j in range(no):
+                        f.write(" ".join(str(v) for v in degerler[(i, j)]) + "\n")
+                for sec, satirlar in altlar:
+                    f.write(f"{sec} {sum(1 << i for i in satirlar)}\n")
+                    for i, anahtar in satirlar.items():
+                        beklenen[i].append(js["cik"][anahtar])
+            for i in range(DR):
+                f.write(f"{len(beklenen[i])}" + "".join(" " + " ".join(str(v) for v in g) for g in beklenen[i]) + "\n")
+
+
+# ----------------------------------------------------------------------------
 # Ana program
 # ----------------------------------------------------------------------------
 def fark_orani(a, b):
@@ -381,7 +428,7 @@ def duz(x):
     return [x]
 
 
-def calistir(ag):
+def calistir(ag, klasor=None):
     S.ag_kur(ag)
     ad = ag["ad"]
     AKT0, W0, etiket = S.baslangic_verisi()
@@ -420,12 +467,18 @@ def calistir(ag):
     print(f"[{ad}] 3) Adım 4'e göre farklı eleman oranı (grup tanımı değişti, beklenen): "
           + ", ".join(f"AKT{l} {fark_orani(t['AKT'][l], t4['AKT'][l]):.0%}" for l in range(1, L + 1))
           + f", W {fark_orani(t['W'], t4['W']):.0%}; s_a Adım 4 {t4['s_a']}")
+    if klasor:
+        import os
+        os.makedirs(klasor, exist_ok=True)
+        grup_vektorleri_yaz(os.path.join(klasor, "dizi_grup.txt"), y["istat"])
+        print(f"[{ad}] 4) Vektörler yazıldı: {klasor}/dizi_grup.txt")
     return y, t
 
 
-def main():
-    calistir(S.AG1)
-    calistir(S.AG2)
+def main(klasor="adim5_vektorleri"):
+    import os
+    calistir(S.AG1, klasor)
+    calistir(S.AG2, os.path.join(klasor, "ag2"))
     S.ag_kur(S.AG1)
 
 

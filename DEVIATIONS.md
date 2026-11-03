@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D77**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D78**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -858,6 +858,21 @@ Grup = bir satırın 16 PE çıkışı (sütunlar farklı çıkış kanalları),
     4'teki ile aynı).
   - SRU kanalı başına bir işte en çok 30 grup (≤ 64, D63); PE başına Psum FIFO en çok 15 kayıt (≤ 64, D74).
 - **Durum:** Claude, 04.11, 5b. RTL'de grup kurulumu sıradaki adım.
+
+### D77 — Grup kurucu: satır başına son grup bekletilir, iş sonunda bütün satırlar birlikte last_group ile iter
+- **Ne:** `final/rtl/dizi/grup_kurucu.v`. Moda göre her satırın grubunu seçer (PE şeridi ya da WG
+  akümülatörü, D76), dolu sütunların dışını 0 yapar ve `sru_array`'e verir. Her satırın en son grubu bir
+  kayıtta bekletilir: yeni grup gelince bekleyen itilir, `son_it`'te bekleyenlerin hepsi aynı çevrimde
+  `last_group = 1` ile itilir.
+- **Neden:** Egemen'in `sru_array`'i bütün kanalların son grubunu aynı çevrimde varsayıyor (paylaşılan G,
+  "lockstep", D30). Dizide satırların grup sayısı farklı olabiliyor (BP s2'de dolgu kırpması D52, boş
+  satırlar), son grupları farklı çevrimlere düşüyor. Adım 4'teki A4 (D64) çözümünün dizi hâli. `[Çıkarım]`
+- **Kanıt:** `[Ölçüldü]` `tb_grup_kurucu` (`grup_kurucu` + `sru_array`, dizi golden'ının
+  `adim5_vektorleri/dizi_grup.txt`'sine karşı; kayıtta olmayan PE'ler ve dolu sütunların dışı rastgele):
+  ag1 + ag2, 16 iş, 648 grup + 16 G: 664/664 (XSIM CLI). Bilerek sokulan 6 hatanın 6'sı yakalandı (sütun
+  maskesi yok, şerit seçimi yok, akümülatör indisi 3 bit, son grup itilmiyor, satır/sütun indisi ters,
+  last_group yalnızca satır 0'ın maskesiyle).
+- **Durum:** Claude, 04.11, 5b. `dizi/run_sim.tcl`'ye eklendi.
 
 ---
 
