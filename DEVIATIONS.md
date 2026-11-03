@@ -950,3 +950,8 @@ Grup = bir satırın 16 PE çıkışı (sütunlar farklı çıkış kanalları),
 12. **Komut satırından `xsim.bat ... -testplusarg AD=deger` verilince `=` argümanı bölüyor** (cmd'nin
    `.bat` argüman ayrıştırması). Vivado GUI/Tcl'deki `xsim.simulate.xsim.more_options` yolu etkilenmez.
    Çözüm: komut satırında vektörleri çalışma klasörüne kopyala (testbench'lerin yedek yolu, tuzak 7).
+13. **Vivado GUI'de `launch_simulation`, üst seviyedeki bütün sinyalleri dalga penceresine ekliyor; çok
+   geniş register'lı (~100 bin bit) ve SV kuyruk dizili bir testbench'te GUI'nin dalga görünümü (Java)
+   çöküyor** (`hs_err_pid*.log`: `WVExecutive_getGraphicsDataSize`, EXCEPTION_ACCESS_VIOLATION). Simülasyon
+   değil arayüz çöküyor; `tb_grup_kurucu`'da görüldü `[Ölçüldü, 04.11]`. Çözüm: simset'e yalnızca
+   `run all` içeren bir dosya ver (`xsim.simulate.custom_tcl`), dalga hiç açılmasın (`dizi/run_sim.tcl`).

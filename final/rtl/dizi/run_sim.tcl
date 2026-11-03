@@ -13,7 +13,9 @@
 #    SONUC tb_pe_dizi: PASS 2363392/2363392 (400 komut, 16x16)
 #    SONUC tb_grup_kurucu: PASS 664/664 (2 ag, 648 grup)
 #  Sure: tb_pe_dizi komut satirindaki XSIM'de ~4 dk (512 PE simule ediliyor), tb_grup_kurucu kisa.
-#  Script bu klasorde gecici bir proje (vivado_sim/) kurar ve sonunda kapatir.
+#  Script bu klasorde gecici bir proje (vivado_sim/) kurar ve sonunda kapatir. Dalga penceresi
+#  acilmaz (Vivado'nun dalga gorunumu tb_grup_kurucu'da cokuyordu); dalga icin projeyi acip elle
+#  Run Simulation yapin.
 #  Yazan: Claude, 04.11.2026 (final/, Adim 5a; 5b'de tb_grup_kurucu eklendi)
 # =============================================================================
 
@@ -54,6 +56,12 @@ foreach tb {tb_pe_dizi tb_grup_kurucu} {
     catch {set_property -name {xsim.simulate.runtime} -value {all} -objects [get_filesets $ss]}
     # 512 PE'nin butun sinyalleri dalga penceresine eklenmesin (yavaslatir)
     catch {set_property -name {xsim.simulate.log_all_signals} -value {false} -objects [get_filesets $ss]}
+    # Dalga penceresi hic acilmasin: Vivado'nun varsayilan baslatma script'i ust seviyedeki butun
+    # sinyalleri ekliyor; tb_grup_kurucu'nun buyuk register'lari ve SV kuyruklarinda GUI'nin dalga
+    # gorunumu (Java) cokuyor (04.11, hs_err: WVExecutive_getGraphicsDataSize). Yalnizca "run all".
+    set ozel "$pdir/sadece_run.tcl"
+    set kanal [open $ozel w] ; puts $kanal "run all" ; close $kanal
+    catch {set_property -name {xsim.simulate.custom_tcl} -value $ozel -objects [get_filesets $ss]}
     if {[catch {launch_simulation -simset $ss} hata]} {
         lappend ozet "SONUC $tb: CALISTIRILAMADI ([string range $hata 0 160])"
         catch {close_sim -force}
