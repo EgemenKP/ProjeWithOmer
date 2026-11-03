@@ -872,7 +872,8 @@ Grup = bir satırın 16 PE çıkışı (sütunlar farklı çıkış kanalları),
   ag1 + ag2, 16 iş, 648 grup + 16 G: 664/664 (XSIM CLI). Bilerek sokulan 6 hatanın 6'sı yakalandı (sütun
   maskesi yok, şerit seçimi yok, akümülatör indisi 3 bit, son grup itilmiyor, satır/sütun indisi ters,
   last_group yalnızca satır 0'ın maskesiyle).
-- **Durum:** Claude, 04.11, 5b. `dizi/run_sim.tcl`'ye eklendi.
+- **Durum:** Claude, 04.11, 5b. `dizi/run_sim.tcl`'ye eklendi; Vivado GUI'de `tb_pe_dizi` 2.363.392/2.363.392 ve
+  `tb_grup_kurucu` 664/664 PASS (Ego, 04.11, araç tuzağı 13'ün düzeltmesinden sonra).
 
 ---
 
