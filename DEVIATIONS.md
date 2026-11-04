@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D90**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D91**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -936,6 +936,28 @@ belgede. Özet:
   150 komut. Veri tamponu ag1'de 424 kelime (bank başına 85 adres), ağırlık 64 kelime.
 - **Vektörler:** `adim5_vektorleri/` (ve `ag2/`): `komutlar_dizi.txt`, `bolgeler.txt`, `veri_baslangic.txt`,
   `veri_beklenen.txt`, `agirlik_baslangic.txt`, `agirlik_beklenen.txt`.
+- **Durum:** Claude, 04.11.
+
+### D90 — Ön-getirme RTL'i (`on_getirme.v`) ve tamponlar (Adım 5b-3b)
+- **Ne:** `veri_tamponu.v` (16 bank, 134 bitlik kelime = 16 × int8 + l, eşzamanlı okuma), `agirlik_tamponu.v`
+  (16 bank, 72 bit), `on_getirme.v`. Ön-getirme bir DİZİ komutunda:
+  - **AGR:** FP'de 16 bank paralel 1 okuma; BP'de bank (o mod 16)'dan 16 ardışık okuma, s1'de 180° döndürme, s2'de
+    Fig. 4(b) yüklemesi (D82).
+  - **SATIR:** FP/BP'de okunan kanalın **bütün haritası** satır register'larına (H ≤ HMAX = 16, W ≤ WMAX = 16);
+    WG'de 3 aktivasyon satırı (bir kelime 16 PE satırının kanallarını verir) ve hata satırı (16 sütunun kanalları).
+    Her kelime okunurken bank başına bir `gms_group16`'dan geçer (D78).
+  - **AKIŞ:** T çevrim; dolgu, çift/tek ayırma (FP s2, WG s2), BP s2 sıfır ekleme satır register'larından akışa
+    geçerken. Etkin olmayan satır ve sütunlar 0.
+  - Bir okuma fazından sonraki faza geçerken 1 çevrim bekleme (son okumanın yakalanması sırasında bölge ve G
+    değişmesin).
+- **Neden "bütün harita":** Test ağında haritalar ≤ 7×7. Satır karosu (D79'un 16 satırdan büyük haritalar için
+  pencere yüklemesi) ve W > 16 kapsam dışı; CIFAR boyutunda RTL gelecek iş. `[Çıkarım]`
+- **Kanıt:** `[Ölçüldü]` `tb_on_getirme`: tamponlar golden'ın hâliyle yüklenip (veri: son hâl, her bölge bir kez
+  yazılıyor; ağırlık: başlangıç hâli, D46), her DİZİ komutunun akışının her çevriminde 16 satırın akis1/2/3'ü,
+  16 sütunun hattı, mod ve T golden'ın `onget_izi.txt`'sine karşı: ag1 + ag2, 184 komut, 6 mod:
+  241.128/241.128 (XSIM CLI). Bilerek sokulan 8 hatanın 8'i yakalandı (GMS yok, BP s1 döndürme yok, BP s2
+  yükleme sırası, FP s2 tek akış kayık, BP s1 dolgusu, WG hata kayık, WG hata bölgesine geçmiyor (zaman aşımı),
+  kanal baytı seçimi yok).
 - **Durum:** Claude, 04.11.
 
 ---

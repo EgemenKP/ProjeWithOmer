@@ -207,10 +207,44 @@ def lms_yaz(T, J, ad, b, karo, r, x, grup, anahtar, islem=None):
     J.olay[anahtar] = (M, l)
 
 
-def dizi_gecisi(T, J, kom, AKT_relu):
+IZ = None          # liste verilirse her DİZİ komutunun ön-getirme izi buraya eklenir (onget_izi.txt)
+
+
+def alanlar(mod, g):
+    """pe_golden'ın çevrim girişi -> (akis1[3], akis2[3], akis3[3]) — sistem_golden.pe_izi_yaz ile aynı eşleme.
+    WG'de hata dizide sütun hattından gelir (D73): satır akışının o alanı 0."""
+    a1, a2, a3 = [0] * 3, [0] * 3, [0] * 3
+    if mod in (0, 2):
+        a1 = g[0:3]
+    elif mod == 1:
+        a1 = [g[0], g[2], g[4]]; a2 = [g[1], g[3], g[5]]
+    elif mod == 3:
+        a1 = g[0:3]
+    elif mod == 4:
+        a1 = [g[0], g[2], g[4]]
+    else:
+        a1 = [g[0], g[3], g[6]]; a2 = [g[1], g[4], g[7]]
+    return list(a1) + list(a2) + list(a3)
+
+
+def hata_alani(mod, g):
+    """WG'de PE'nin hata akışı (satır 0'ın değeri; üç iç satırda aynı)."""
+    return g[1] if mod == 4 else g[2]
+
+
+def iz_kaydet(kom_no, mod, satir_cev, sutun):
+    if IZ is None:
+        return
+    T_ = len(next(iter(satir_cev.values())))
+    IZ.append((kom_no, mod, T_, {i: [alanlar(mod, g) for (g, _, _) in c] for i, c in satir_cev.items()},
+               {j: (v if mod < 4 else [hata_alani(mod, g) for (g, _, _) in v]) for j, v in sutun.items()}))
+
+
+def dizi_gecisi(T, J, kom, AKT_relu, kom_no=0):
     """Bir DİZİ komutu: ön-getirme (GMS'li okuma) + 16x16 PE + Psum FIFO + son'da grup/LMS/yazma."""
     _, faz, l, b, k0, k1, z, ilk, son, _ = kom
     k = S.KATMANLAR[l - 1]
+    satir_cev, sutun = {}, {}
     if faz == FAZ_FP:
         o0, c, r0 = k0 * NB, k1, z * NB
         no, nr = min(NB, k["cout"] - o0), min(NB, k["ho"] - r0)
@@ -220,7 +254,16 @@ def dizi_gecisi(T, J, kom, AKT_relu):
             X = [Xp[k["s"] * (r0 + i) + q] for q in range(3)]
             for j in range(no):
                 psum = [0] * k["wo"] if ilk else J.fifo_oku((i, j), (b, r0))
-                cikis[(i, j)] = DG.fp_pe(k, X, T.agr_oku(l, o0 + j, c), psum)
+                Wk = T.agr_oku(l, o0 + j, c)
+                if k["s"] == 1:
+                    cev, cik = PE.pe_gecis_s1(X, Wk, PE.ps_akisi_s(psum, len(X[0])))
+                else:
+                    cift, tek = zip(*[PE.cift_tek_ayir(s_) for s_ in X])
+                    cev, cik = PE.pe_gecis_s2(list(cift), list(tek), Wk, PE.ps_akisi_s(psum, len(cift[0])))
+                cikis[(i, j)] = [d[0] for (_, d) in cik]
+                satir_cev.setdefault(i, cev)
+                sutun.setdefault(j, PE.duzlestir(Wk))
+        iz_kaydet(kom_no, k["s"] - 1, satir_cev, sutun)
         for (i, j), v in cikis.items():
             if not son:
                 J.fifo_yaz((i, j), (b, r0), v)
@@ -251,8 +294,12 @@ def dizi_gecisi(T, J, kom, AKT_relu):
                 T_ = len(X[0])
                 for j in range(nc):
                     psum = [0] * k["w"] if ilk else J.fifo_oku((i, j), (b, m0))
-                    _, cik = PE.pe_gecis_s1(X, PE.dondur_180(T.agr_oku(l, o, c0 + j)), PE.ps_akisi_s(psum, T_))
+                    Wr = PE.dondur_180(T.agr_oku(l, o, c0 + j))
+                    cev, cik = PE.pe_gecis_s1(X, Wr, PE.ps_akisi_s(psum, T_))
                     cikis[(i, j)] = [d[0] for (_, d) in cik]
+                    satir_cev.setdefault(i, cev)
+                    sutun.setdefault(j, PE.duzlestir(Wr))
+            iz_kaydet(kom_no, 2, satir_cev, sutun)
             if not son:
                 for ij, v in cikis.items():
                     J.fifo_yaz(ij, (b, m0), v)
@@ -278,8 +325,11 @@ def dizi_gecisi(T, J, kom, AKT_relu):
                 Wk = T.agr_oku(l, o, c0 + j)
                 w_yuklu = [[Wk[q][2], Wk[q][0], Wk[q][1]] for q in range(3)]
                 psum4 = [[0] * n for _ in range(4)] if ilk else J.fifo_oku((i, j), (b, p0))
-                _, cik = PE.pe_gecis_bp_s2(akislar, w_yuklu, PE.ps_akisi_bp_s2(psum4, T_))
+                cev, cik = PE.pe_gecis_bp_s2(akislar, w_yuklu, PE.ps_akisi_bp_s2(psum4, T_))
                 serit[(i, j)] = [[d[s_] for (_, d) in cik] for s_ in range(4)]
+                satir_cev.setdefault(i, cev)
+                sutun.setdefault(j, PE.duzlestir(w_yuklu))
+        iz_kaydet(kom_no, 3, satir_cev, sutun)
         if not son:
             for ij, v in serit.items():
                 J.fifo_yaz(ij, (b, p0), v)
@@ -307,11 +357,15 @@ def dizi_gecisi(T, J, kom, AKT_relu):
             e_sat = T.harita(f"HATA{l}", b, o0 + j)[r]
             if k["s"] == 1:
                 T_ = len(a_sat[0])
-                PE.pe_gecis_wg_s1(a_sat, [e_sat + [0] * (T_ - len(e_sat))] * 3, J.akum[(i, j)])
+                cev, _ = PE.pe_gecis_wg_s1(a_sat, [e_sat + [0] * (T_ - len(e_sat))] * 3, J.akum[(i, j)])
             else:
                 cift, tek = zip(*[PE.cift_tek_ayir(s_) for s_ in a_sat])
                 T_ = len(cift[0])
-                PE.pe_gecis_wg_s2(list(cift), list(tek), [e_sat + [0] * (T_ - len(e_sat))] * 3, J.akum[(i, j)])
+                cev, _ = PE.pe_gecis_wg_s2(list(cift), list(tek), [e_sat + [0] * (T_ - len(e_sat))] * 3,
+                                           J.akum[(i, j)])
+            satir_cev.setdefault(i, cev)
+            sutun.setdefault(j, cev)
+    iz_kaydet(kom_no, 3 + k["s"], satir_cev, sutun)
     if son:
         for i in range(nc):
             for q in range(9):
@@ -326,13 +380,13 @@ def yorumla(sablon, T, etiket):
     lfsr = S.CY.kanal_tohumlari(S.N_SINIF)
     komutlar, isler = [], []
     J = None
-    for kom in sablon:
+    for kom_no, kom in enumerate(sablon):
         kom = list(kom)
         op, faz, l = kom[0], kom[1], kom[2]
         if op == OP_IS_BASLA:
             J = Is(faz, l, kom[4])
         elif op == OP_DIZI:
-            dizi_gecisi(T, J, kom, l > 1 and S.KATMANLAR[l - 2]["relu"])
+            dizi_gecisi(T, J, kom, l > 1 and S.KATMANLAR[l - 2]["relu"], kom_no)
         elif op == OP_OLCEK:
             assert all(not f for f in J.fifo.values()), "iş sonunda Psum FIFO boş olmalı"
             G = max(0, J.B_max - J.hedef)
@@ -418,6 +472,26 @@ def yaz_agirlik(yol, T):
         f.write(f"{len(satir)}\n" + "\n".join(satir) + "\n")
 
 
+def yaz_onget_izi(yol, iz):
+    """onget_izi.txt — tb_on_getirme için: her DİZİ komutunda ön-getirmenin diziye verdiği akışlar.
+      1. satır: kayıt sayısı
+      Her kayıt: K kom_no mod T nr nc
+        nr*T satır (satır i, çevrim t sırasıyla): akis1[0..2] akis2[0..2] akis3[0..2] (int8; WG'de hata alanı 0)
+        nc satır: mod < 4 ise sütun j'nin 9 ağırlığı (PE'ye yüklenen hâli: BP s1 döndürülmüş, BP s2 Fig. 4b);
+                  WG'de sütun j'nin T çevrimlik hata akışı
+      Kayıtta olmayan satırlar/sütunlar (nr, nc dışı) 0 olmalı."""
+    with open(yol, "w") as f:
+        f.write(f"{len(iz)}\n")
+        for kom_no, mod, T_, satirlar, sutunlar in iz:
+            nr, nc = 1 + max(satirlar), 1 + max(sutunlar)
+            f.write(f"K {kom_no} {mod} {T_} {nr} {nc}\n")
+            for i in range(nr):
+                for t in range(T_):
+                    f.write(" ".join(str(v) for v in satirlar[i][t]) + "\n")
+            for j in range(nc):
+                f.write(" ".join(str(v) for v in sutunlar[j]) + "\n")
+
+
 # ----------------------------------------------------------------------------
 # Ana program
 # ----------------------------------------------------------------------------
@@ -431,7 +505,10 @@ def calistir(ag, klasor):
     yaz_veri(os.path.join(klasor, "veri_baslangic.txt"), T)
     yaz_agirlik(os.path.join(klasor, "agirlik_baslangic.txt"), T)
     sablon = komut_sablonu()
+    global IZ
+    IZ = []
     komutlar, s_a, isler = yorumla(sablon, T, etiket)      # (III'')
+    iz, IZ = IZ, None
     AKT, HATA, W = coz(T)
     for l in range(1, S.L + 1):
         assert S.esit_mi(AKT[l], t["AKT"][l]), f"{ad}: AKT {l} farklı"
@@ -450,6 +527,8 @@ def calistir(ag, klasor):
     yaz_bolgeler(os.path.join(klasor, "bolgeler.txt"), T)
     yaz_veri(os.path.join(klasor, "veri_beklenen.txt"), T)
     yaz_agirlik(os.path.join(klasor, "agirlik_beklenen.txt"), T)
+    yaz_onget_izi(os.path.join(klasor, "onget_izi.txt"), iz)
+    S.yaz_ag(os.path.join(klasor, "ag_yapilandirma.txt"))
     print(f"[{ad}] Vektörler yazıldı: {klasor}/")
     return komutlar, T
 
