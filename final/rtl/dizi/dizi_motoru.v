@@ -16,8 +16,8 @@
 //      T − 1); B şeritlerinin 1 çevrim gecikmesi pe_dizi'de. son = 0 ise geçerli çıkışlar FIFO'ya yazılır.
 //    - son = 1, FP / BP s1: her geçerli çıkış çevriminde satır başına bir grup (şerit 0) -> LMS.
 //    - son = 1, BP s2: bir çevrimde 4 şerit = satır başına 4 grup; LMS ve tampon çevrim başına satır başına
-//      bir grup aldığı için çıkışlar satır başına bir kayıt belleğinde (bufr) bekletilir, akıştan sonra
-//      (q, şerit) sırasıyla boşaltılır. Dolguya düşen konumlar atlanır (D52). Satır i ve i+8 aynı banka
+//      bir grup aldığı için çıkışlar PE'lerin kendi Psum FIFO'sunda bekletilir (D98; önceden ayrı bir kayıt
+//      belleği, bufr, 448 RAMB36), akıştan sonra (q, şerit) sırasıyla FIFO başından boşaltılır. Dolguya düşen konumlar atlanır (D52). Satır i ve i+8 aynı banka
 //      yazar (dX satırı 2p + δ − p); 8'den fazla satır etkinse her adım iki yarıda (D83).
 //    - son = 1, WG: akıştan sonra mod tutulur (girişler 0, akümülatörler sabit), 9 çevrimde
 //      akümülatör q (= 3ki + kj) grubu -> GRAD[l].
@@ -119,11 +119,13 @@ module dizi_motoru #(
     reg  [NB*72-1:0]     pe_w;
     wire [NB*NB*128-1:0] cikis;
     wire [NB*NB*288-1:0] g;
+    wire [NB*NB*128-1:0] ps_bas;                // PE'lerin FIFO başları (D98)
     pe_dizi #(.R(NB), .C(NB), .PS_DERINLIK(PS_DERINLIK), .PS_AW(PS_AW)) u_dizi (
         .clk(clk), .rst(pe_rst), .mod(pe_mod),
         .satir_akis1_flat(pe_a1), .satir_akis2_flat(pe_a2), .satir_akis3_flat(pe_a3), .sutun_w_flat(pe_w),
         .ps_temizle(ps_temizle), .ps_yaz(ps_yaz), .ps_oku(ps_oku), .ps_sec(ps_sec),
-        .cikis_flat(cikis), .g_flat(g), .ps_tasma(ps_tasma), .ps_eksik(ps_eksik), .ps_bos(ps_bos));
+        .cikis_flat(cikis), .g_flat(g), .ps_tasma(ps_tasma), .ps_eksik(ps_eksik), .ps_bos(ps_bos),
+        .ps_bas_flat(ps_bas));
 
     // ---- geçiş sayıları ----
     integer nr, nc, npass, v0, Np, c_say, tt;
@@ -148,22 +150,13 @@ module dizi_motoru #(
     end
     wire cikis_gecerli = (og_akis || (durum == M_SON1)) && (tt >= v0) && (tt <= og_T - 1);
 
-    // ---- BP s2 çıkış kayıtları ----
-    localparam NQ = WMAX / 2 + 2;
-    // Satır başına bir bellek (çevrimde bir yazma, saatsiz okuma -> dağıtık RAM): kayıt q = satırın 16 PE'sinin
-    // 4 şeridi. (3f: tek dizide 16 yazma portu RAM'e eşlenemiyordu.)
-    wire [NB*NB*128-1:0] buf_oku;               // satır i'nin dq. kaydı
+    // ---- BP s2 son geçiş: çıkışlar PE'nin Psum FIFO'sunda (D98) ----
+    // Shao III-A (Fig. 4(b)): "The Psum FIFO queue receives four partial sums in parallel". Son geçişin q. çıkışı
+    // (4 şerit) ara geçişlerdeki gibi FIFO'ya yazılır; boşaltmada FIFO başı (ps_bas) kayıt q'dur ve q'nun 4 şeridi
+    // (ve 2 yarısı) bitince çıkarılır. FIFO'da bir geçişten fazlası beklemez (D94), derinlik 64 yeter (T − 1 ≤ 17).
     reg [7:0] dq, ds; reg dh;                   // boşaltma: q, şerit, yarı
-
-    wire buf_yaz = (fz == 2'd1) && (s != 1) && son_k && cikis_gecerli;
-    genvar gb;
-    generate
-        for (gb = 0; gb < NB; gb = gb + 1) begin : bufr
-            reg [NB*128-1:0] mem [0:NQ-1];
-            always @(posedge clk) if (buf_yaz) mem[tt - v0] <= cikis[NB*128*gb +: NB*128];
-            assign buf_oku[NB*128*gb +: NB*128] = mem[dq];
-        end
-    endgenerate
+    wire bp2_son = (fz == 2'd1) && (s != 1) && son_k;
+    wire bp2_cikar = (durum == M_BP2) && !(!dh && nr > 8) && (ds == 8'd3);
 
     // ---- WG boşaltma ----
     reg [3:0] wq;
@@ -220,7 +213,7 @@ module dizi_motoru #(
                 if (R >= 0 && R < h && C >= 0 && C < w) begin
                     A_gec[i] = 1'b1;
                     for (j = 0; j < NB; j = j + 1) if (j < nc)
-                        A_grup[512*i + 32*j +: 32] = buf_oku[NB*128*i + 128*j + 32*ds +: 32];
+                        A_grup[512*i + 32*j +: 32] = ps_bas[NB*128*i + 128*j + 32*ds +: 32];
                 end
             end else if (durum == M_WG && i < nr) begin                                   // WG
                 A_gec[i] = 1'b1;
@@ -305,7 +298,8 @@ module dizi_motoru #(
             pe_mod = og_mod; pe_a1 = og_a1; pe_a2 = og_a2; pe_a3 = og_a3; pe_w = og_w;
             if (fz != 2'd2 && !ilk_k && og_t < Np) begin ps_oku = 1'b1; ps_sec = 1'b1; end
         end
-        if (fz != 2'd2 && !son_k && cikis_gecerli) ps_yaz = 1'b1;
+        if (fz != 2'd2 && (!son_k || bp2_son) && cikis_gecerli) ps_yaz = 1'b1;
+        if (bp2_cikar) ps_oku = 1'b1;           // D98: boşaltmada kayıt q bitti
     end
 
     // ---- Durum makinesi ----

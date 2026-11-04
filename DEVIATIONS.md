@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D98**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D99**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -1124,6 +1124,21 @@ sentez sonrası `report_power` iki koşuda da 25 dk'dan fazla ilerlemedi, durdur
   (D87) en büyük H 32, yani kullanılmıyor.
 - **PE Psum FIFO (D94):** T ≤ W + 4 = 36 ≤ 64; derinlik 64 kalıyor.
 - **Durum:** Claude, 05.11. Kaynak etkisi (c) + (d) sonrası sentezde ölçülecek.
+
+### D98 — BP s2 son geçişinin çıkışları PE'nin Psum FIFO'sunda (ayrı kayıt belleği kaldırıldı, Adım 5c-d)
+- **Ne:** BP s2'de PE bir çevrimde 4 çıkış (çift-çift, çift-tek, tek-çift, tek-tek) üretiyor; LMS ve tampon satır
+  başına çevrimde bir grup aldığı için son geçişin çıkışları bekletilmeli. Önceden `dizi_motoru.v`'de satır başına
+  ayrı bir kayıt belleği vardı (`bufr`, 16 × 18 × 2048 bit; sentezde 448 RAMB36, VC709'un %30'u). Artık son geçişin
+  çıkışları da ara geçişlerdeki gibi PE'nin kendi Psum FIFO'suna (128 bit = 4 şerit, D74) yazılıyor. Akıştan sonra
+  motor FIFO başını (`pe_dizi` yeni çıkışı `ps_bas_flat`) okuyor, kayıt q'nun 4 şeridi (ve 8'den fazla satırda
+  iki yarısı) bitince çıkarıyor. Boşaltma sırası ve çevrim sayısı aynı.
+- **Kanıt:** `[PDF tam]` III-A (Fig. 4(b) açıklaması): "The Psum FIFO queue receives four partial sums in parallel
+  when the PE works in this case." `[Çıkarım]` FIFO başının PE dışına (satırın LMS'ine) çıkması Fig. 2'deki Psum
+  FIFO'nun yorumu; Shao boşaltma sırasını vermiyor. FIFO'da bir geçişten fazlası beklemez (D94): T − 1 ≤ 17 ≤ 64.
+  `[Ölçüldü]` XSIM CLI (5 ağ): `tb_dizi_motoru` 10001/10001 (iş sonunda FIFO boş, taşma / eksik yok),
+  `tb_sistem_dizi` 10961/10961, 34584 çevrim (D97 ile aynı), `tb_pe_dizi` 2363392/2363392 (yeni port, davranış aynı). Mutasyon (yakalandı): FIFO'dan
+  hiç çıkarılmıyor (3214 hata), çıkarma şerit 3 yerine 2'de (2229), son geçişte FIFO'ya yazılmıyor (3283).
+- **Durum:** Claude, 05.11.
 
 ---
 

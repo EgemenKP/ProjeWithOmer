@@ -32,6 +32,8 @@
 //    cikis_flat [R*C*128], g_flat [R*C*288] : PE (r,c)'nin çıkışları, indis r*C + c
 //    ps_tasma, ps_eksik : bütün FIFO'ların bayraklarının VEYA'sı (testte 0 kalmalı)
 //    ps_bos         : bütün FIFO'lar boş (5b-3c'de eklendi; işin sonunda 1 olmalı)
+//    ps_bas_flat [R*C*128] : her PE'nin FIFO'sunun baştaki kaydı (D98: BP s2'nin son geçişinde 4 kısmi
+//                     toplam FIFO'da bekler, motor buradan boşaltır; III-A "receives four partial sums in parallel")
 //  Yazan: Claude, 04.11.2026 (final/, Adım 5a)
 // =============================================================================
 `timescale 1ns/1ps
@@ -57,7 +59,8 @@ module pe_dizi #(
     output wire [R*C*288-1:0]   g_flat,
     output wire                 ps_tasma,
     output wire                 ps_eksik,
-    output wire                 ps_bos          // bütün Psum FIFO'lar boş (iş sonunda 1 olmalı)
+    output wire                 ps_bos,         // bütün Psum FIFO'lar boş (iş sonunda 1 olmalı)
+    output wire [R*C*128-1:0]   ps_bas_flat     // D98: FIFO başları (BP s2 son geçiş boşaltması)
 );
 
     localparam BP_S2 = 3'd3, WG_S1 = 3'd4, WG_S2 = 3'd5;
@@ -85,6 +88,7 @@ module pe_dizi #(
                     .tasma(tasma_v[I]), .eksik(eksik_v[I])
                 );
                 assign bos_v[I] = bos;
+                assign ps_bas_flat[128*I +: 128] = bas;
 
                 // BP s2'nin B şeritleri: bir önceki çevrimde çıkarılan kayıt
                 reg [127:0] b_gec;

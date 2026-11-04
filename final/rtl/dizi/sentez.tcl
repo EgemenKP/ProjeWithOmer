@@ -75,7 +75,7 @@ module pe_dizi #(parameter R = 16, parameter C = 16, parameter PS_DERINLIK = 64,
     input  wire [R*24-1:0] satir_akis3_flat, input wire [C*72-1:0] sutun_w_flat,
     input  wire ps_temizle, input wire ps_yaz, input wire ps_oku, input wire ps_sec,
     output wire [R*C*128-1:0] cikis_flat, output wire [R*C*288-1:0] g_flat,
-    output wire ps_tasma, output wire ps_eksik, output wire ps_bos);
+    output wire ps_tasma, output wire ps_eksik, output wire ps_bos, output wire [R*C*128-1:0] ps_bas_flat);
 endmodule}
     close $kanal
     lappend rtl $kutu
