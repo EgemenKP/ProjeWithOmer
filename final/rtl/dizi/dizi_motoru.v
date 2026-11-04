@@ -16,7 +16,7 @@
 //      T − 1); B şeritlerinin 1 çevrim gecikmesi pe_dizi'de. son = 0 ise geçerli çıkışlar FIFO'ya yazılır.
 //    - son = 1, FP / BP s1: her geçerli çıkış çevriminde satır başına bir grup (şerit 0) -> LMS.
 //    - son = 1, BP s2: bir çevrimde 4 şerit = satır başına 4 grup; LMS ve tampon çevrim başına satır başına
-//      bir grup aldığı için çıkışlar satır başına bir kayıt tamponunda (BUF) bekletilir, akıştan sonra
+//      bir grup aldığı için çıkışlar satır başına bir kayıt belleğinde (bufr) bekletilir, akıştan sonra
 //      (q, şerit) sırasıyla boşaltılır. Dolguya düşen konumlar atlanır (D52). Satır i ve i+8 aynı banka
 //      yazar (dX satırı 2p + δ − p); 8'den fazla satır etkinse her adım iki yarıda (D83).
 //    - son = 1, WG: akıştan sonra mod tutulur (girişler 0, akümülatörler sabit), 9 çevrimde
@@ -137,8 +137,20 @@ module dizi_motoru #(
 
     // ---- BP s2 çıkış kayıtları ----
     localparam NQ = WMAX / 2 + 2;
-    reg [NB*128-1:0] BUF [0:NB*NQ-1];           // [satır*NQ + q]: satırın 16 PE'sinin 4 şeridi
+    // Satır başına bir bellek (çevrimde bir yazma, saatsiz okuma -> dağıtık RAM): kayıt q = satırın 16 PE'sinin
+    // 4 şeridi. (3f: tek dizide 16 yazma portu RAM'e eşlenemiyordu.)
+    wire [NB*NB*128-1:0] buf_oku;               // satır i'nin dq. kaydı
     reg [7:0] dq, ds; reg dh;                   // boşaltma: q, şerit, yarı
+
+    wire buf_yaz = (fz == 2'd1) && (s != 1) && son_k && cikis_gecerli;
+    genvar gb;
+    generate
+        for (gb = 0; gb < NB; gb = gb + 1) begin : bufr
+            reg [NB*128-1:0] mem [0:NQ-1];
+            always @(posedge clk) if (buf_yaz) mem[tt - v0] <= cikis[NB*128*gb +: NB*128];
+            assign buf_oku[NB*128*gb +: NB*128] = mem[dq];
+        end
+    endgenerate
 
     // ---- WG boşaltma ----
     reg [3:0] wq;
@@ -177,7 +189,7 @@ module dizi_motoru #(
                 if (R >= 0 && R < h && C >= 0 && C < w) begin
                     A_gec[i] = 1'b1;
                     for (j = 0; j < NB; j = j + 1) if (j < nc)
-                        A_grup[512*i + 32*j +: 32] = BUF[i*NQ + dq][128*j + 32*ds +: 32];
+                        A_grup[512*i + 32*j +: 32] = buf_oku[NB*128*i + 128*j + 32*ds +: 32];
                 end
             end else if (durum == M_WG && i < nr) begin                                   // WG
                 A_gec[i] = 1'b1;
@@ -271,8 +283,6 @@ module dizi_motoru #(
         B_islem <= (fz == 2'd0 && relu_l) ? 2'd1 : (fz == 2'd1 && relu_once) ? 2'd2 : 2'd0;
         if (is_basla) hedef <= hedef_in;
         // BP s2 son geçişinde çıkışları kaydet
-        if (fz == 2'd1 && s != 1 && son_k && cikis_gecerli)
-            for (bq = 0; bq < NB; bq = bq + 1) BUF[bq*NQ + (tt - v0)] <= cikis[NB*128*bq +: NB*128];
         if (rst) begin
             durum <= M_BOS; B_gec <= {NB{1'b0}};
         end else case (durum)
