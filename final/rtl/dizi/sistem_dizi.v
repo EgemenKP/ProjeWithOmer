@@ -165,12 +165,14 @@ module sistem_dizi #(
         if (no > 16) no = 16;
     end
 
-    function [AW-1:0] adres;
-        input integer taban, bi, n_karo, kr, H_, W_, satir, x;
-        begin
-            adres = taban + ((bi * n_karo + kr) * ((H_ + 15) / 16) + satir / 16) * W_ + x;
-        end
-    endfunction
+    // D96 (Adım 5c-b): adresler (D81, AW bitte sarar). CLU: AKT[L] / HATA[L] (1×1 harita, tek karo) -> taban + b.
+    // WU: ağırlık taban + o-karo·cin + c; GRAD[l] taban + (o-karo·⌈cin/16⌉ + c/16)·9 + q. Komut boyunca sabit
+    // (kom register'ı), tek çarpım kopyası.
+    wire [7:0]    cin8      = cfg_cin[8*(k_l-1) +: 8];
+    wire [AW-1:0] clu_a_adr = taban_akt [AW*cfg_L +: AW] + k_b;
+    wire [AW-1:0] clu_e_adr = taban_hata[AW*cfg_L +: AW] + k_b;
+    wire [AW-1:0] wu_a_adr  = taban_agr[AW*k_l +: AW] + k_x * cin8 + k_y;
+    wire [AW-1:0] wu_g_bas  = taban_grad[AW*k_l +: AW] + (k_x * (({4'd0, cin8} + 12'd15) >> 4) + (k_y >> 4)) * 4'd9;
 
     // ---- yürütücü ----
     localparam Y_BOS = 4'd0, Y_DIZI = 4'd1, Y_CLU_OKU = 4'd2, Y_CLU_AL = 4'd3, Y_CLU_BEKLE = 4'd4,
@@ -185,23 +187,23 @@ module sistem_dizi #(
         y_v_yaz_en = {NB{1'b0}}; y_v_yaz_adr = {NB*AW{1'b0}}; y_v_yaz_veri = {NB*134{1'b0}};
         y_a_yaz_en = {NB{1'b0}}; y_a_yaz_adr = {NB*AW{1'b0}}; y_a_yaz_veri = {NB*72{1'b0}};
         case (yd)
-            Y_CLU_OKU: y_v_adr[0 +: AW] = adres(taban_akt[AW*L +: AW], k_b, 1, 0, 1, 1, 0, 0);
+            Y_CLU_OKU: y_v_adr[0 +: AW] = clu_a_adr;
             Y_WU: begin
                 for (jj = 0; jj < NB; jj = jj + 1)
-                    y_a_adr[AW*jj +: AW] = taban_agr[AW*k_l +: AW] + k_x * cin + k_y;
+                    y_a_adr[AW*jj +: AW] = wu_a_adr;
                 if (wq_say < 9)
-                    y_v_adr[AW*(k_y % 16) +: AW] = adres(taban_grad[AW*k_l +: AW], 0, (cout + 15) / 16, k_x, cin, 9, k_y, wq_say);
+                    y_v_adr[AW*k_y[3:0] +: AW] = wu_g_bas + wq_say;
             end
             Y_WU_YAZ: begin
                 for (jj = 0; jj < NB; jj = jj + 1) if (jj < no) begin
                     y_a_yaz_en[jj] = 1'b1;
-                    y_a_yaz_adr[AW*jj +: AW] = taban_agr[AW*k_l +: AW] + k_x * cin + k_y;
+                    y_a_yaz_adr[AW*jj +: AW] = wu_a_adr;
                     for (qq = 0; qq < 9; qq = qq + 1) y_a_yaz_veri[72*jj + 8*qq +: 8] = wu_yeni[qq][8*jj +: 8];
                 end
             end
             Y_CLU_BEKLE: if (clu_bitti) begin
                 y_v_yaz_en[0] = 1'b1;
-                y_v_yaz_adr[0 +: AW] = adres(taban_hata[AW*L +: AW], k_b, 1, 0, 1, 1, 0, 0);
+                y_v_yaz_adr[0 +: AW] = clu_e_adr;
                 y_v_yaz_veri[0 +: 134] = {6'd0, 48'd0, clu_e};
             end
             default: ;

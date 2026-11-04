@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D96**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D97**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -1067,6 +1067,25 @@ sığmıyor. Plan: (e) döngü sırası, (a) sabitler register'da, (b) sayaçlı
   4829/4829 (21120 çevrim, öncekiyle aynı). Mutasyon: BP s2'de T − 1 → 210 hata; ReLU-geri maskesinin katmanı
   bir kayık → 1462 hata (ikisi de yakalandı). Kaynak etkisi ayrı ölçülmedi: tam sistem sentezi 1,5 sa ve
   13 GB sürüyor; (a) + (b) birlikte ölçülecek.
+- **Durum:** Claude, 05.11.
+
+### D96 — Adresler sayaçla, çarpımlar yalnızca komut başında (Adım 5c-b)
+- **Ne:** D81'in adres formülü (taban + ((b·n_karo + karo)·⌈H/16⌉ + satır/16)·W + x) artık her çevrimde ve her
+  bank/satır için ayrı ayrı 32 bit `integer` çarpımlarıyla hesaplanmıyor:
+  - `on_getirme.v`: bölge tabanları (AKT[l−1], HATA[l]), ağırlık adresi, WG'nin 3 aktivasyon satırının ve hata
+    satırının satır payı `basla`'da bir kez (AW bit). FP/BP SATIR'da 16 bankın adresi aynı (satır = 16·tur + k,
+    k < 16 → satır/16 = tur) ve ardışık: taban + `o_say` (her SATIR çevriminde +1). WG: taban + satır payı + x.
+  - `dizi_motoru.v`: yazma tabanı (FP AKT[l], BP HATA[l−1], WG GRAD[l]) ve BP maske tabanı (AKT[l−1]) `basla`'da;
+    akışta taban + sütun (BP s2: satır bloğu 2z − 1 / 2z / 2z + 1 → −W / 0 / +W). Bank = satır[3:0].
+  - `sistem_dizi.v`: CLU adresleri taban + b; WU adresleri komut alanlarından tek kopya.
+  - Adres AW bitte sarar; önceki 32 bit hesabın alt AW biti ile aynı (yalnızca + ve ·).
+- **Neden:** 3f sentezinde `adres()` motorda 48, ön-getirmede 16'dan fazla kopya 32 bit değişkenli çarpıma
+  dönüşüyordu (sistemde yalnızca 31 DSP). Donanımda adres üreteci sayaç + toplayıcıdır. `[Çıkarım]`
+- **Kanıt:** `[Ölçüldü]` XSIM CLI: `tb_on_getirme` 890446/890446, `tb_dizi_motoru` 4000/4000, `tb_sistem_dizi`
+  4829/4829 (21120 çevrim). Mutasyon: WU GRAD adresinde c/16 yok → 78 hata; BP ağırlık adresinde c-karosu yok →
+  8250 hata (yakalandı). BP s2'de ikinci satır bloğunun +W payı 0 → yakalanmadı: H ≤ 16 sınırında (D90) satır
+  hep ilk blokta, eşdeğer. Aynı nedenle WG satır payı ve hata satırı payı bugünkü testlerde hep 0; bu yollar
+  (c) adımının H = 32'lik test ağıyla kapsanacak.
 - **Durum:** Claude, 05.11.
 
 ---

@@ -177,14 +177,32 @@ module dizi_motoru #(
     wire [NB*128-1:0] lms_c8;
     wire [NB*6-1:0]   lms_l, lms_B;
 
-    function [AW-1:0] adres;
-        input integer taban, bi, n_karo, kr, H_, W_, satir, x;
-        begin
-            adres = taban + ((bi * n_karo + kr) * ((H_ + 15) / 16) + satir / 16) * W_ + x;
-        end
+    // D96 (Adım 5c-b): yazma ve maske adresleri. Adres (D81) = taban + ((b·n_karo + karo)·⌈H/16⌉ + satır/16)·W + x
+    // (AW bitte sarar). 16 satırın satır/16'sı FP'de, BP s1'de ve WG'de aynı (satır = 16·z + i, i < 16); BP s2'de
+    // 2z − 1, 2z ya da 2z + 1. Çarpımlar yalnızca basla'da bir kez; akışta taban + (BP s2: ±W) + sütun.
+    function [11:0] karo_n;                          // ceil(n / 16)
+        input [11:0] n;
+        begin karo_n = (n + 12'd15) >> 4; end
     endfunction
+    wire [7:0]    g_cin  = cfg_cin[8*g_li +: 8], g_cout = cfg_cout[8*g_li +: 8];
+    wire [AW-1:0] g_bp_ic = ((b * karo_n({4'd0, g_cin}) + k0) * karo_n({4'd0, g_h}) + (g_s2 ? 2*z : z)) * g_w;
+    reg  [AW-1:0] g_yaz_bas;
+    always @* begin
+        case (faz)
+            2'd0:    g_yaz_bas = taban_akt[AW*l +: AW]
+                               + ((b * karo_n({4'd0, g_cout}) + k0) * karo_n(g_ho) + z) * g_wo[7:0];
+            2'd1:    g_yaz_bas = taban_hata[AW*g_li +: AW] + g_bp_ic;
+            default: g_yaz_bas = taban_grad[AW*l +: AW] + (k1 * karo_n({4'd0, g_cin}) + k0) * 4'd9;
+        endcase
+    end
+    reg [AW-1:0] r_yaz_bas, r_mask_bas;
+    always @(posedge clk) if (durum == M_BOS && basla) begin
+        r_yaz_bas  <= g_yaz_bas;
+        r_mask_bas <= taban_akt[AW*g_li +: AW] + g_bp_ic;
+    end
 
-    integer i, j, R, C, sr, xr, kanal_sec;
+    integer i, j, R, C, sr, xr, kanal_sec, e;
+    reg [AW-1:0] satir_pay;
     always @* begin
         A_grup = {NB*512{1'b0}}; A_gec = {NB{1'b0}}; A_adr = {NB*AW{1'b0}}; A_madr = {NB*AW{1'b0}};
         A_bank = {NB*4{1'b0}};
@@ -193,7 +211,7 @@ module dizi_motoru #(
             if (fz == 2'd0 && son_k && cikis_gecerli && i < nr) begin                    // FP
                 A_gec[i] = 1'b1; R = 16*zz + i; C = tt - v0;
                 for (j = 0; j < NB; j = j + 1) if (j < nc) A_grup[512*i + 32*j +: 32] = cikis[128*(i*NB + j) +: 32];
-                A_adr[AW*i +: AW] = adres(taban_akt[AW*ll +: AW], bb, (cout + 15) / 16, kk0, ho, wo, R, C);
+                A_adr[AW*i +: AW] = r_yaz_bas + C;
             end else if (fz == 2'd1 && s == 1 && son_k && cikis_gecerli && i < nr) begin  // BP s1
                 A_gec[i] = 1'b1; R = 16*zz + i; C = tt - v0;
                 for (j = 0; j < NB; j = j + 1) if (j < nc) A_grup[512*i + 32*j +: 32] = cikis[128*(i*NB + j) +: 32];
@@ -207,13 +225,16 @@ module dizi_motoru #(
             end else if (durum == M_WG && i < nr) begin                                   // WG
                 A_gec[i] = 1'b1;
                 for (j = 0; j < NB; j = j + 1) if (j < nc) A_grup[512*i + 32*j +: 32] = g[288*(i*NB + j) + 32*wq +: 32];
-                A_adr[AW*i +: AW] = adres(taban_grad[AW*ll +: AW], 0, (cout + 15) / 16, kk1, cin, 9, 16*kk0 + i, wq);
+                A_adr[AW*i +: AW] = r_yaz_bas + wq;
             end
             if (fz == 2'd1) begin                                                          // BP: HATA[l-1] ve maske
-                A_adr[AW*i +: AW]  = adres(taban_hata[AW*(ll-1) +: AW], bb, (cin + 15) / 16, kk0, h, w, R, C);
-                A_madr[AW*i +: AW] = adres(taban_akt [AW*(ll-1) +: AW], bb, (cin + 15) / 16, kk0, h, w, R, C);
+                // satır R'nin 16'lık bloğu: s1'de z, s2'de 2z + (−1 | 0 | +1) (e = R − 32z)
+                e = R - 32*zz;
+                satir_pay = (s == 1 || (e >= 0 && e < 16)) ? {AW{1'b0}} : (e < 0) ? -w : w;
+                A_adr[AW*i +: AW]  = r_yaz_bas  + satir_pay + C;
+                A_madr[AW*i +: AW] = r_mask_bas + satir_pay + C;
             end
-            A_bank[4*i +: 4] = (fz == 2'd2) ? (16*kk0 + i) % 16 : R % 16;
+            A_bank[4*i +: 4] = (fz == 2'd2) ? i[3:0] : R[3:0];
         end
     end
 

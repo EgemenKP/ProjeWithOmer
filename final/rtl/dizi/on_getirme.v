@@ -132,12 +132,44 @@ module on_getirme #(
         endcase
     end
 
-    function [AW-1:0] adres;
-        input integer taban, bi, n_karo, kr, H_, W_, satir, x;
-        begin
-            adres = taban + ((bi * n_karo + kr) * ((H_ + 15) / 16) + satir / 16) * W_ + x;
-        end
+    // ---- D96 (Adım 5c-b): okuma adresleri ----
+    // Adres (D81) = taban + ((b·n_karo + karo)·⌈H/16⌉ + satır/16)·W + x, AW bitte sarar. Çarpımlar yalnızca basla'da,
+    // bir kez (bölge tabanı, WG'nin 3 satırının ve hata satırının satır payı); akışta toplama ve sayaç:
+    //   FP/BP SATIR: 16 bankın adresi aynı (satır 16·tur + k, k < 16 -> satır/16 = tur) = taban + o_say, o_say her
+    //   SATIR çevriminde +1 (tur·W + x ardışık). WG SATIR: taban + q_pay[q] + x. HATA: taban + h_pay + x.
+    function [11:0] karo_n;                          // ceil(n / 16)
+        input [11:0] n;
+        begin karo_n = (n + 12'd15) >> 4; end
     endfunction
+    wire [AW-1:0] g_karo_akt  = (faz == 2'd2) ? k0 : (k1 >> 4);
+    wire [AW-1:0] g_karo_hata = (faz == 2'd2) ? k1 : (k1 >> 4);
+    wire [AW-1:0] g_bas_akt   = taban_akt[AW*g_li +: AW]
+                              + ((b * karo_n({4'd0, g_cin}) + g_karo_akt) * karo_n({4'd0, g_h})) * g_w;
+    wire [AW-1:0] g_bas_hata  = taban_hata[AW*l +: AW]
+                              + ((b * karo_n({4'd0, g_cout}) + g_karo_hata) * karo_n(g_ho)) * g_wo[7:0];
+    wire [AW-1:0] g_agr_fp    = taban_agr[AW*l +: AW] + k0 * g_cin + k1;
+    wire [AW-1:0] g_agr_bp    = taban_agr[AW*l +: AW] + (k1 >> 4) * g_cin + {k0, 4'd0};
+    reg  [AW-1:0] r_bas_akt, r_bas_hata, r_agr, r_h_pay, o_say;
+    reg  [AW-1:0] r_q_pay [0:2];
+    reg  [3:0]    r_q_bank [0:2];
+    reg  [2:0]    r_q_gec;
+    integer gq, g_ra;
+    always @(posedge clk) begin
+        if (durum == D_BOS && basla) begin
+            r_bas_akt  <= g_bas_akt;
+            r_bas_hata <= g_bas_hata;
+            r_agr      <= (faz == 2'd0) ? g_agr_fp : g_agr_bp;
+            r_h_pay    <= (z >> 4) * g_wo[7:0];
+            o_say      <= {AW{1'b0}};
+            for (gq = 0; gq < 3; gq = gq + 1) begin   // WG: aktivasyon satırı ra = s·z + q − p
+                g_ra = (g_s2 ? 2*z : z) + gq - g_p;
+                r_q_gec[gq]  <= (g_ra >= 0) && (g_ra < g_h);
+                r_q_bank[gq] <= g_ra[3:0];
+                r_q_pay[gq]  <= (g_ra >> 4) * g_w;
+            end
+        end else if (durum == D_SATIR)
+            o_say <= o_say + 1'b1;
+    end
 
     // ---- GMS: bank başına bir gms_group16 (D78) ----
     wire [NB*128-1:0] gms_cikis;
@@ -174,40 +206,31 @@ module on_getirme #(
     reg [7:0] yak_x, yak_tur;
     integer   kk, rr, xx, ii, jj, idx;
 
-    // Okuma adresleri (saatsiz)
-    integer ka, ra, qa;
+    // Okuma adresleri (saatsiz; D96: çarpım yok)
+    integer ka, qa;
+    wire [AW-1:0] R_bas = hata_bolgesi ? r_bas_hata : r_bas_akt;
     always @* begin
         v_oku_adr = {NB*AW{1'b0}};
         a_oku_adr = {NB*AW{1'b0}};
         case (durum)
             D_AGR: begin
                 if (fz == 2'd0) begin
-                    for (ka = 0; ka < NB; ka = ka + 1)
-                        a_oku_adr[AW*ka +: AW] = taban_agr[AW*ll +: AW] + kk0 * cin + kk1;
+                    for (ka = 0; ka < NB; ka = ka + 1) a_oku_adr[AW*ka +: AW] = r_agr;
                 end else begin
                     // BP: o = k1 sabit, sütun stur = c0 + stur, bank o mod 16
-                    a_oku_adr[AW*(kk1 % 16) +: AW] = taban_agr[AW*ll +: AW] + (kk1 / 16) * cin + 16*kk0 + stur;
+                    a_oku_adr[AW*kk1[3:0] +: AW] = r_agr + stur;
                 end
             end
             D_SATIR: begin
                 if (fz != 2'd2) begin
-                    for (ka = 0; ka < NB; ka = ka + 1) begin
-                        ra = 16*stur + ka;
-                        if (ra < RH)
-                            v_oku_adr[AW*ka +: AW] = adres(R_taban, bb, (RC + 15) / 16, karo, RH, RW, ra, sx);
-                    end
+                    for (ka = 0; ka < NB; ka = ka + 1)
+                        if ({stur, 4'd0} + ka < RH) v_oku_adr[AW*ka +: AW] = R_bas + o_say;
                 end else begin
-                    for (qa = 0; qa < 3; qa = qa + 1) begin
-                        ra = (r_s2 ? 2*zz : zz) + qa - p;
-                        if (ra >= 0 && ra < RH)
-                            v_oku_adr[AW*(ra % 16) +: AW] = adres(R_taban, bb, (RC + 15) / 16, karo, RH, RW, ra, sx);
-                    end
+                    for (qa = 0; qa < 3; qa = qa + 1)
+                        if (r_q_gec[qa]) v_oku_adr[AW*r_q_bank[qa] +: AW] = R_bas + r_q_pay[qa] + sx;
                 end
             end
-            D_HATA: begin
-                ra = zz;
-                v_oku_adr[AW*(ra % 16) +: AW] = adres(R_taban, bb, (RC + 15) / 16, karo, RH, RW, ra, sx);
-            end
+            D_HATA: v_oku_adr[AW*zz[3:0] +: AW] = R_bas + r_h_pay + sx;
             default: ;
         endcase
     end
