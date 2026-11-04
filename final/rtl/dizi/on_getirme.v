@@ -65,43 +65,49 @@ module on_getirme #(
     assign akis   = (durum == D_AKIS);
     assign mesgul = (durum != D_BOS);
 
-    // ---- komut ve katman boyutları (basla'da tutulur) ----
+    // ---- komut ve katman boyutları ----
+    // D95 (Adım 5c-a): katmanın boyutları, etkin satır/sütun sayıları ve akış boyu basla'da komut girişlerinden
+    // bir kez hesaplanıp register'da tutulur; s ∈ {1, 2} olduğundan "/ s" bir kaydırma (önceden her çevrim
+    // 32 bit değişkene bölme). Değerler öncekiyle aynı (geçerli komutlar için).
     reg [1:0]  fz;
     reg [3:0]  ll;
     reg [7:0]  bb, kk0, kk1, zz;
-    integer    cin, cout, h, w, s, p, ho, wo;
+    wire [3:0]  g_li   = l - 4'd1;
+    wire [7:0]  g_cin  = cfg_cin [8*g_li +: 8];
+    wire [7:0]  g_cout = cfg_cout[8*g_li +: 8];
+    wire [7:0]  g_h    = cfg_h   [8*g_li +: 8];
+    wire [7:0]  g_w    = cfg_w   [8*g_li +: 8];
+    wire        g_s2   = (cfg_s  [8*g_li +: 8] == 8'd2);
+    wire [7:0]  g_p    = cfg_p   [8*g_li +: 8];
+    wire [11:0] g_h2p  = {4'd0, g_h} + {3'd0, g_p, 1'b0};
+    wire [11:0] g_w2p  = {4'd0, g_w} + {3'd0, g_p, 1'b0};
+    wire [11:0] g_ho   = g_s2 ? (((g_h2p - 12'd3) >> 1) + 12'd1) : (g_h2p - 12'd2);
+    wire [11:0] g_wo   = g_s2 ? (((g_w2p - 12'd3) >> 1) + 12'd1) : (g_w2p - 12'd2);
+    wire [11:0] g_np   = ({4'd0, g_h} + {4'd0, g_p} + 12'd1) >> 1;
+    wire [11:0] g_Tfw  = g_s2 ? (((g_w2p + 12'd1) >> 1) + 12'd1) : g_w2p;          // FP / WG
+    wire [11:0] g_Tb   = g_s2 ? (g_wo + 12'd2) : (g_wo + 12'd4 - {3'd0, g_p, 1'b0});  // BP
+    reg  [11:0] g_nr, g_nc, g_T;
     always @* begin
-        cin  = cfg_cin [8*(ll-1) +: 8];
-        cout = cfg_cout[8*(ll-1) +: 8];
-        h    = cfg_h   [8*(ll-1) +: 8];
-        w    = cfg_w   [8*(ll-1) +: 8];
-        s    = cfg_s   [8*(ll-1) +: 8];
-        p    = cfg_p   [8*(ll-1) +: 8];
-        ho   = (h + 2*p - 3) / s + 1;
-        wo   = (w + 2*p - 3) / s + 1;
-    end
-
-    // Etkin satır / sütun sayıları ve akış boyu
-    integer nr, nc, T_hesap;
-    integer npass;
-    always @* begin
-        npass = (h + p + 1) / 2;
-        case (fz)
-            2'd0: begin
-                nr = ho - 16*zz;  nc = cout - 16*kk0;
-                T_hesap = (s == 1) ? (w + 2*p) : ((w + 2*p + 1) / 2 + 1);
-            end
-            2'd1: begin
-                nr = (s == 1) ? (h - 16*zz) : (npass - 16*zz);  nc = cin - 16*kk0;
-                T_hesap = (s == 1) ? (wo + 2*(2 - p)) : (wo + 2);
-            end
-            default: begin
-                nr = cin - 16*kk0;  nc = cout - 16*kk1;
-                T_hesap = (s == 1) ? (w + 2*p) : ((w + 2*p + 1) / 2 + 1);
-            end
+        case (faz)
+            2'd0:    begin g_nr = g_ho - {z, 4'd0};                  g_nc = g_cout - {k0, 4'd0}; g_T = g_Tfw; end
+            2'd1:    begin g_nr = (g_s2 ? g_np : g_h) - {z, 4'd0};   g_nc = g_cin  - {k0, 4'd0}; g_T = g_Tb;  end
+            default: begin g_nr = g_cin - {k0, 4'd0};                g_nc = g_cout - {k1, 4'd0}; g_T = g_Tfw; end
         endcase
-        if (nr > 16) nr = 16;
-        if (nc > 16) nc = 16;
+    end
+    reg [7:0] r_cin, r_cout, r_h, r_w, r_p, r_ho, r_wo, r_T;
+    reg       r_s2;
+    reg [4:0] r_nr, r_nc;
+    always @(posedge clk) if (durum == D_BOS && basla) begin
+        r_cin <= g_cin; r_cout <= g_cout; r_h <= g_h; r_w <= g_w; r_p <= g_p; r_s2 <= g_s2;
+        r_ho <= g_ho[7:0]; r_wo <= g_wo[7:0]; r_T <= g_T[7:0];
+        r_nr <= (g_nr > 12'd16) ? 5'd16 : g_nr[4:0];
+        r_nc <= (g_nc > 12'd16) ? 5'd16 : g_nc[4:0];
+    end
+    integer cin, cout, h, w, s, p, ho, wo, nr, nc, T_hesap;
+    always @* begin
+        cin = r_cin; cout = r_cout; h = r_h; w = r_w; p = r_p; ho = r_ho; wo = r_wo;
+        s = r_s2 ? 2 : 1;
+        nr = r_nr; nc = r_nc; T_hesap = r_T;
     end
 
     // ---- Okunan bölge: FP/WG-aktivasyon AKT[l-1], BP/WG-hata HATA[l] ----
@@ -192,7 +198,7 @@ module on_getirme #(
                     end
                 end else begin
                     for (qa = 0; qa < 3; qa = qa + 1) begin
-                        ra = s*zz + qa - p;
+                        ra = (r_s2 ? 2*zz : zz) + qa - p;
                         if (ra >= 0 && ra < RH)
                             v_oku_adr[AW*(ra % 16) +: AW] = adres(R_taban, bb, (RC + 15) / 16, karo, RH, RW, ra, sx);
                     end
@@ -249,7 +255,7 @@ module on_getirme #(
                             end
                         end else begin
                             for (q = 0; q < 3; q = q + 1) begin
-                                rr = s*zz + q - p;
+                                rr = (r_s2 ? 2*zz : zz) + q - p;
                                 LRW[q*WMAX + yak_x] <= (rr >= 0 && rr < RH) ? gms_cikis[128*(rr % 16) +: 128] : 128'd0;
                             end
                         end

@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D95**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D96**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -1050,6 +1050,23 @@ sığmıyor. Plan: (e) döngü sırası, (a) sabitler register'da, (b) sayaçlı
   yakalıyor). `tb_pe_dizi`, `tb_grup_kurucu` bu değişiklikten etkilenmiyor (kendi vektörleri).
 - **FIFO derinliği (D12, D74):** 64 kalıyor; T ≤ 64 olan her harita için batch'ten bağımsız yeter (WMAX 32'de
   T ≤ 36). (c) adımında WMAX'e göre yeniden boyutlanacak.
+- **Durum:** Claude, 05.11.
+
+### D95 — Komut sabitleri basla'da register'a, "/ s" kaydırma (Adım 5c-a)
+- **Ne:** `on_getirme.v` ve `dizi_motoru.v`: katmanın boyutları (cin, cout, h, w, s, p, Ho, Wo), ön-getirmede
+  etkin satır/sütun sayıları (nr, nc ≤ 16) ve akış boyu T, motorda ReLU bayrakları komutun `basla`'sında komut
+  girişlerinden bir kez hesaplanıp register'da tutulur. `s ∈ {1, 2}` olduğundan Ho = (H + 2p − 3)/s + 1 bir
+  kaydırma: s2 ? ((H + 2p − 3) >> 1) + 1 : H + 2p − 2. `s·z` çarpımı da mux (s2 ? 2z : z). Önceden bu değerler
+  her çevrimde `ll`'den 32 bit `integer` aritmetiğiyle, değişkene bölmeyle hesaplanıyordu.
+- **Neden:** 3f sentezinde `/ s` her modülde ayrı bir 32 bit kombinasyonel bölücüye dönüşüyordu (Adım 5c girişi).
+  Değerler komut boyunca sabit; Shao'nun FSM'i PE'leri ve ön-getirmeyi "according to different training phases"
+  yapılandırıyor (IV), yani komut başında yapılandırma. `[Çıkarım]`
+- **Varsayım:** s ∈ {1, 2} (3×3 conv, D87; Shao Fig. 3–5 yalnızca s1 ve s2). s başka bir değer alırsa s1 gibi
+  davranır; test ağları ve VGG16 benzeri ağ yalnızca 1 ve 2 kullanıyor.
+- **Kanıt:** `[Ölçüldü]` XSIM CLI: `tb_on_getirme` 890446/890446, `tb_dizi_motoru` 4000/4000, `tb_sistem_dizi`
+  4829/4829 (21120 çevrim, öncekiyle aynı). Mutasyon: BP s2'de T − 1 → 210 hata; ReLU-geri maskesinin katmanı
+  bir kayık → 1462 hata (ikisi de yakalandı). Kaynak etkisi ayrı ölçülmedi: tam sistem sentezi 1,5 sa ve
+  13 GB sürüyor; (a) + (b) birlikte ölçülecek.
 - **Durum:** Claude, 05.11.
 
 ---

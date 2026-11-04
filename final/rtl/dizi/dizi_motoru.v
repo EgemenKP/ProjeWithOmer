@@ -72,15 +72,28 @@ module dizi_motoru #(
     // ---- komut ----
     reg [1:0] fz;  reg [3:0] ll;  reg [7:0] bb, kk0, kk1, zz;  reg ilk_k, son_k;
     reg [2:0] hedef;
+    // D95 (Adım 5c-a): katmanın boyutları basla'da komut girişlerinden bir kez hesaplanıp register'da tutulur;
+    // s ∈ {1, 2} -> "/ s" bir kaydırma (önceden her çevrim 32 bit değişkene bölme).
+    wire [3:0]  g_li  = l - 4'd1;
+    wire [7:0]  g_h   = cfg_h[8*g_li +: 8], g_w = cfg_w[8*g_li +: 8], g_p = cfg_p[8*g_li +: 8];
+    wire        g_s2  = (cfg_s[8*g_li +: 8] == 8'd2);
+    wire [11:0] g_h2p = {4'd0, g_h} + {3'd0, g_p, 1'b0};
+    wire [11:0] g_w2p = {4'd0, g_w} + {3'd0, g_p, 1'b0};
+    wire [11:0] g_ho  = g_s2 ? (((g_h2p - 12'd3) >> 1) + 12'd1) : (g_h2p - 12'd2);
+    wire [11:0] g_wo  = g_s2 ? (((g_w2p - 12'd3) >> 1) + 12'd1) : (g_w2p - 12'd2);
+    reg [7:0] r_cin, r_cout, r_h, r_w, r_p, r_ho, r_wo;
+    reg       r_s2, r_relu, r_relu_once;
+    always @(posedge clk) if (durum == M_BOS && basla) begin
+        r_cin <= cfg_cin[8*g_li +: 8]; r_cout <= cfg_cout[8*g_li +: 8];
+        r_h <= g_h; r_w <= g_w; r_p <= g_p; r_s2 <= g_s2; r_ho <= g_ho[7:0]; r_wo <= g_wo[7:0];
+        r_relu      <= (cfg_relu[8*g_li +: 8] != 8'd0);
+        r_relu_once <= (l >= 4'd2) ? (cfg_relu[8*(l-4'd2) +: 8] != 8'd0) : 1'b0;
+    end
     integer cin, cout, h, w, s, p, ho, wo, relu_l, relu_once;
     always @* begin
-        cin  = cfg_cin [8*(ll-1) +: 8];  cout = cfg_cout[8*(ll-1) +: 8];
-        h    = cfg_h   [8*(ll-1) +: 8];  w    = cfg_w   [8*(ll-1) +: 8];
-        s    = cfg_s   [8*(ll-1) +: 8];  p    = cfg_p   [8*(ll-1) +: 8];
-        relu_l    = cfg_relu[8*(ll-1) +: 8];
-        relu_once = (ll >= 2) ? cfg_relu[8*(ll-2) +: 8] : 0;
-        ho = (h + 2*p - 3) / s + 1;
-        wo = (w + 2*p - 3) / s + 1;
+        cin = r_cin; cout = r_cout; h = r_h; w = r_w; p = r_p; ho = r_ho; wo = r_wo;
+        s = r_s2 ? 2 : 1;
+        relu_l = r_relu; relu_once = r_relu_once;
     end
 
     // ---- ön-getirme ----
