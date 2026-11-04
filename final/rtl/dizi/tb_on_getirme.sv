@@ -206,6 +206,7 @@ module tb_on_getirme_govde;
         rst = 1'b0;
         ag_kos("");
         ag_kos("ag2/");
+        ag_kos("ag3/");
         if (hata == 0) $display("SONUC tb_on_getirme: PASS %0d/%0d (%0d ag, %0d DIZI komutu)", kontrol, kontrol, n_ag, n_kayit_top);
         else           $display("SONUC tb_on_getirme: FAIL %0d hata / %0d", hata, kontrol);
         sfd = $fopen({dizin, "sonuc_tb_on_getirme.txt"}, "w");

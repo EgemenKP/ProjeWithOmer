@@ -31,6 +31,7 @@
 //    ps_sec         : 1 ise A şeritlerine (0, 2) baştaki kayıt, 0 ise 0 verilir
 //    cikis_flat [R*C*128], g_flat [R*C*288] : PE (r,c)'nin çıkışları, indis r*C + c
 //    ps_tasma, ps_eksik : bütün FIFO'ların bayraklarının VEYA'sı (testte 0 kalmalı)
+//    ps_bos         : bütün FIFO'lar boş (5b-3c'de eklendi; işin sonunda 1 olmalı)
 //  Yazan: Claude, 04.11.2026 (final/, Adım 5a)
 // =============================================================================
 `timescale 1ns/1ps
@@ -55,12 +56,14 @@ module pe_dizi #(
     output wire [R*C*128-1:0]   cikis_flat,
     output wire [R*C*288-1:0]   g_flat,
     output wire                 ps_tasma,
-    output wire                 ps_eksik
+    output wire                 ps_eksik,
+    output wire                 ps_bos          // bütün Psum FIFO'lar boş (iş sonunda 1 olmalı)
 );
 
     localparam BP_S2 = 3'd3, WG_S1 = 3'd4, WG_S2 = 3'd5;
 
-    wire [R*C-1:0] tasma_v, eksik_v;
+    wire [R*C-1:0] tasma_v, eksik_v, bos_v;
+    assign ps_bos   = &bos_v;
     assign ps_tasma = |tasma_v;
     assign ps_eksik = |eksik_v;
 
@@ -81,6 +84,7 @@ module pe_dizi #(
                     .bas_veri(bas), .bos(bos), .dolu(dolu), .doluluk(doluluk),
                     .tasma(tasma_v[I]), .eksik(eksik_v[I])
                 );
+                assign bos_v[I] = bos;
 
                 // BP s2'nin B şeritleri: bir önceki çevrimde çıkarılan kayıt
                 reg [127:0] b_gec;

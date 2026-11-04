@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D91**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D92**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -955,9 +955,34 @@ belgede. Özet:
 - **Kanıt:** `[Ölçüldü]` `tb_on_getirme`: tamponlar golden'ın hâliyle yüklenip (veri: son hâl, her bölge bir kez
   yazılıyor; ağırlık: başlangıç hâli, D46), her DİZİ komutunun akışının her çevriminde 16 satırın akis1/2/3'ü,
   16 sütunun hattı, mod ve T golden'ın `onget_izi.txt`'sine karşı: ag1 + ag2, 184 komut, 6 mod:
-  241.128/241.128 (XSIM CLI). Bilerek sokulan 8 hatanın 8'i yakalandı (GMS yok, BP s1 döndürme yok, BP s2
+  241.128/241.128 (XSIM CLI; ag3 eklenince 489.430/489.430, D91). Bilerek sokulan 8 hatanın 8'i yakalandı (GMS yok, BP s1 döndürme yok, BP s2
   yükleme sırası, FP s2 tek akış kayık, BP s1 dolgusu, WG hata kayık, WG hata bölgesine geçmiyor (zaman aşımı),
   kanal baytı seçimi yok).
+- **Durum:** Claude, 04.11.
+
+### D91 — Dizi motoru (`dizi_motoru.v`, Adım 5b-3c)
+- **Ne:** Bir DİZİ komutunu yürütür: ön-getirme → `pe_dizi` → (son = 1) grup → satır başına `lms_group16` (B'ler
+  paylaşılan `global_max_reducer16`'ya) → ReLU / ReLU-geri (maske GMS'li AKT[l−1], D86) → veri tamponuna kelime + l.
+  - Zamanlama D66'nın dizi hâli: akışın t. çevriminde golden'ın t. adım girişi, t. adım çıkışı t + 1. çevrimde;
+    akıştan sonra 1 yakalama çevrimi (mod tutulur, girişler 0). Psum: ilk = 0 ise t < T − 2 (BP s2'de T − 1)
+    çevrimlerinde FIFO okunur; son = 0 ise geçerli çıkışlar FIFO'ya yazılır.
+  - **BP s2, son = 1:** bir çevrimde satır başına 4 grup çıkıyor, LMS ve tampon çevrim başına satır başına bir grup
+    alıyor. Çıkışlar satır başına bir kayıt tamponunda (q ≤ WMAX/2 + 2) bekletilip (q, şerit) sırasıyla
+    boşaltılıyor; 8'den fazla satır etkinse her adım iki yarıda (satır i ve i + 8 aynı banka yazıyor, D83).
+    Shao bu durumu yazmıyor (yalnızca "The Psum FIFO queue receives four partial sums in parallel").
+    Bedeli: 16 satır × 16 PE × 128 bit × q kayıt. `[Çıkarım]`
+  - **WG, son = 1:** akıştan sonra mod tutulur (girişler 0, akümülatörler sabit), 9 çevrimde akümülatör grupları.
+  - İŞ_BAŞLA: hedef tutulur, G toplayıcı ve Psum FIFO'lar sıfırlanır. Komutlar sırayla (D50).
+- **AG3 (yeni test ağı, yalnızca dizi sistemi için):** 16×16 giriş, 4 katman (2→3 s1p1, 3→4 s2p1, 4→5 s2p0,
+  5→10 s1p0). 1. katmanda 16 PE satırının hepsi dolu; 2. katmanın BP s2'sinde 9 geçiş (iki yarı yolu). ag1 ve ag2'de
+  en çok 4 satır etkin olduğu için bu yollar sınanmıyordu.
+- **Kanıt:** `[Ölçüldü]` `tb_dizi_motoru`: golden'ın komut listesi sırayla (İŞ_BAŞLA, DİZİ, ÖLÇEK'te motorun G'si
+  ve Psum FIFO'ların boşluğu), sonunda veri tamponunun golden'da yazılı bütün kelimeleri (tampon her ağdan önce
+  sıfırlanıyor): ag1 + ag2 + ag3, 306 DİZİ komutu, 2784 kelime: 2841/2841 (XSIM CLI). `tb_on_getirme` de ag3 ile:
+  489.430/489.430. Bilerek sokulan 9 hatanın 9'u yakalandı (maske GMS'siz, FP ReLU yok, Psum okuma sayısı,
+  son'da FIFO'ya yazma (FIFO boşluğu kontrolü eklenince), BP s2 geçerlilik başlangıcı, WG sıfırlama yok, l
+  yazılmıyor, m_u yok sayılıyor, BP s2 kayıt indisi).
+- **`pe_dizi.v`'ye ek:** `ps_bos` çıkışı (bütün FIFO'lar boş).
 - **Durum:** Claude, 04.11.
 
 ---

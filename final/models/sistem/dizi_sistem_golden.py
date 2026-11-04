@@ -533,9 +533,20 @@ def calistir(ag, klasor):
     return komutlar, T
 
 
+# AG3 (5b-3c): 16x16 giriş; 1. katmanda 16 PE satırının hepsi dolu, 2. katman BP s2'de 9 geçiş (> 8: satır i ve
+# i + 8 aynı banka yazar, iki yarıda yazma yolu, D83), FP s2 dolgulu ve dolgusuz.
+AG3 = dict(ad="ag3", batch=2, tohum=77, katmanlar=[
+    dict(cin=2, cout=3,  h=16, w=16, s=1, p=1, relu=1, sw=-8),
+    dict(cin=3, cout=4,  h=16, w=16, s=2, p=1, relu=1, sw=-8),
+    dict(cin=4, cout=5,  h=8,  w=8,  s=2, p=0, relu=1, sw=-8),
+    dict(cin=5, cout=10, h=3,  w=3,  s=1, p=0, relu=0, sw=-9),
+])
+
+
 def main(klasor="adim5_vektorleri"):
     calistir(S.AG1, klasor)
     calistir(S.AG2, os.path.join(klasor, "ag2"))
+    calistir(AG3, os.path.join(klasor, "ag3"))
     S.ag_kur(S.AG1)
 
 
