@@ -19,7 +19,12 @@ Güncel tasarım `final/` altında. Eski `rtl/` ve `models/` karşılaştırma i
 - `final/rtl/dizi/pe_dizi.v`: 256 `pe_birlesik`; satır aynı girişi, sütun aynı ağırlığı paylaşıyor (Shao III-D, Fig. 8). Psum FIFO her PE'nin içinde (D74), MAC'ler DSP'de (D75).
 - Açılım kararları: FP/BP'de satırlara çıkış satırı (D72), WG'de giriş kanalı (D73, Shao'ya sorulabilecek açık soru).
 - Doğrulama: `tb_pe_dizi` 2.363.392/2.363.392 (XSIM CLI), 7 mutasyonun 7'si yakalandı. Sentez: DSP 2304, LUT 243.689.
-- Sırada (5b): grup kurulumu + 16 SRU bağlantısı, çok bankalı tamponlar, ön-getirme, dizi kontrolü, yeni golden.
+
+## Adım 5b: 16×16 dizili tam sistem (04.11.2026)
+- Fig. 8'in bütün blokları RTL'de: FSM (`master_controller_dizi`), dizi motoru (ön-getirme + dizi + 16 SRU'nun LMS'i), çok bankalı veri ve ağırlık tamponları, GMS ön-getirmede (Fig. 6), CLU ve WU. Tasarım: `final/rtl/dizi/TASARIM_DIZI.md`; kararlar D76–D93.
+- Golden: `final/models/sistem/dizi_golden.py`, `dizi_sistem_golden.py` (4 test ağı, `adim5_vektorleri/`).
+- Doğrulama (XSIM CLI): tam sistem bir eğitim adımını kendi FSM'iyle koşturuyor, sonuç golden'la bit bit aynı (`tb_sistem_dizi` 4829/4829). ag1'de eğitim adımı 2448 çevrim (Adım 4'te 25.434). Bütün testler: `final/rtl/dizi/run_sim.tcl`.
+- Sırada: sentez/timing/güç (Table I/II karşılığı), CIFAR-10 deneyi (Fig. 9 karşılığı, `final/models/cifar/`).
 
 Kararlar ve makaleden sapmalar: `DEVIATIONS.md`
 

@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D93**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D94**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -999,6 +999,26 @@ belgede. Özet:
   yakalandı; yakalanmayan (BP s1'de satır karosu h yerine geçiş sayısından) D90'ın H ≤ 16 sınırı içinde eşdeğer:
   desteklenen her ağda iki sayı da 1 karo.
 - **Durum:** Claude, 04.11.
+
+### D93 — Dizili tam sistem (`sistem_dizi.v`, Adım 5b-3e): bir eğitim adımı uçtan uca
+- **Ne:** Fig. 8'in bütün blokları: `master_controller_dizi` (D92) + komut yürütücü + `dizi_motoru` (D91) +
+  `veri_tamponu` / `agirlik_tamponu` (D80–D82) + fonksiyon motoru (Egemen'in CLU'su `fe_top` üzerinden, D60/D62;
+  `wu_unit`, D41). Yürütücü:
+  - ÖLÇEK: motorun G'si işin yazdığı bölgenin G register'ına (FP l → AKT[l], BP l → HATA[l−1], WG l → GRAD[l]).
+  - CLU: AKT[L] kelimesi (örnek b) GMS'ten geçer → CLU (s_a komuttan, etiket yapılandırmadan) → HATA[L] kelimesi
+    (l = 0, HATA[L]'nin G'si 0; CLU çıkışı SRU'dan geçmez, D30).
+  - WU (l, o-karo, c): 16 sütun bankasından ağırlık kelimeleri, bank (c mod 16)'dan 9 GRAD kelimesi (GMS, G = GRAD[l]
+    bölgesininki), 9 `wu_unit`, 16 bankaya geri yazma.
+  - Etiketler yapılandırma portundan (`cfg_etiket`, örnek başına 4 bit). `[Çıkarım]` (Adım 4'te bellekteydi.)
+- **Kanıt:** `[Ölçüldü]` `tb_sistem_dizi`: başlangıçta yalnızca AKT0 ve ağırlıklar; sistem `basla` ile bir eğitim
+  adımını kendi FSM'iyle koşturuyor; bitince veri tamponunun golden'da yazılı bütün kelimeleri (aktivasyonlar,
+  hatalar, CLU çıkışı, gradyanlar; 16 int8 + l), ağırlık tamponunun bütün kelimeleri (WU sonrası) ve bölge
+  G'leri golden'la karşılaştırılıyor. ag1–ag4 art arda, aralarında reset yok: 4829/4829, 4774 kelime (XSIM CLI,
+  davranışsal bölücü). Bilerek sokulan 6 hatanın 5'i yakalandı; yakalanmayan (WU'da ağırlığı bir çevrim geç
+  yakalamak) eşdeğer: WU boyunca ağırlık okuma adresi sabit.
+- **Süre (çevrim, eğitim adımı başına):** ag1 2448 (Adım 4'ün tek PE'li sistemi 25.434), ag2 3608 (Adım 4: 48.828),
+  ag3 5614, ag4 9450.
+- **Durum:** Claude, 04.11. `dizi/run_sim.tcl` gerçek bölücü IP'siyle (Adım 4'ün script'iyle aynı IP üretimi).
 
 ---
 

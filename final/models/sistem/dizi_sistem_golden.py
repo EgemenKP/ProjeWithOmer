@@ -529,6 +529,8 @@ def calistir(ag, klasor):
     yaz_agirlik(os.path.join(klasor, "agirlik_beklenen.txt"), T)
     yaz_onget_izi(os.path.join(klasor, "onget_izi.txt"), iz)
     S.yaz_ag(os.path.join(klasor, "ag_yapilandirma.txt"))
+    with open(os.path.join(klasor, "etiket.txt"), "w") as f:      # CLU'nun doğru sınıfları (örnek sırasıyla)
+        f.write(" ".join(str(y) for y in etiket) + "\n")
     print(f"[{ad}] Vektörler yazıldı: {klasor}/")
     return komutlar, T
 
