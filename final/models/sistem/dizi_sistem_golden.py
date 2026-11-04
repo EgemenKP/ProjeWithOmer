@@ -543,10 +543,20 @@ AG3 = dict(ad="ag3", batch=2, tohum=77, katmanlar=[
 ])
 
 
+# AG4 (5b-3d): 16'dan fazla kanal -> birden çok karo: FP'de 2 o-karosu, BP'de 2 c-karosu, WG'de 2 x 2 karo,
+# WU'da 2 o-karosu (D85'in karo döngüleri RTL'de ilk kez).
+AG4 = dict(ad="ag4", batch=2, tohum=99, katmanlar=[
+    dict(cin=3,  cout=20, h=7, w=7, s=1, p=1, relu=1, sw=-8),
+    dict(cin=20, cout=18, h=7, w=7, s=2, p=0, relu=1, sw=-9),
+    dict(cin=18, cout=10, h=3, w=3, s=1, p=0, relu=0, sw=-9),
+])
+
+
 def main(klasor="adim5_vektorleri"):
     calistir(S.AG1, klasor)
     calistir(S.AG2, os.path.join(klasor, "ag2"))
     calistir(AG3, os.path.join(klasor, "ag3"))
+    calistir(AG4, os.path.join(klasor, "ag4"))
     S.ag_kur(S.AG1)
 
 

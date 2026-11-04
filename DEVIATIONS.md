@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D92**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D93**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -983,6 +983,21 @@ belgede. Özet:
   son'da FIFO'ya yazma (FIFO boşluğu kontrolü eklenince), BP s2 geçerlilik başlangıcı, WG sıfırlama yok, l
   yazılmıyor, m_u yok sayılıyor, BP s2 kayıt indisi).
 - **`pe_dizi.v`'ye ek:** `ps_bos` çıkışı (bütün FIFO'lar boş).
+- **Durum:** Claude, 04.11.
+
+### D92 — FSM'in dizi hâli (`master_controller_dizi.v`, Adım 5b-3d) ve AG4
+- **Ne:** Adım 4'ün `master_controller.v`'sinin (değişmeden duruyor) D85 komut setiyle kopyası: KOPYA yok, PE
+  komutu yerine DİZİ geçişi ve karo döngüleri (FP o-karo → c → b → r-karo; BP c-karo → o → b → m/p-karo; WG c-karo
+  → o-karo → b → r; WU o-karo → c), ÖLÇEK'ten sonra FP → SA, BP → aynı katmanın WG'si, WG → WU'lar. Portlar ve el
+  sıkışma aynı.
+- **AG4 (yeni test ağı):** 3→20 (s1p1), 20→18 (s2p0), 18→10 (s1p0), 7×7 giriş, batch 2. 16'dan fazla kanal: FP'de 2
+  o-karosu, BP'de 2 c-karosu, WG'de 2×2 karo, WU'da 2 o-karosu. ag1–ag3'te bütün karo sayıları 1'di; karo
+  döngüleri RTL'de ilk kez AG4 ile sınandı (hızlı model 2–3 karoyu `kontrol_hizli.py`'de sınamıştı, D89).
+- **Kanıt:** `[Ölçüldü]` `tb_fsm_dizi`: FSM'in her komutu (10 alan) golden'ın listesine karşı, ÖLÇEK'te golden G'si,
+  s_a FSM'de hesaplanıyor; ag1–ag4 art arda, aralarında reset yok: 799 komut, 7998/7998. AG4 ile `tb_on_getirme`
+  890.446/890.446 (602 DİZİ komutu), `tb_dizi_motoru` 4000/4000 (3926 kelime). Bilerek sokulan 7 FSM hatasının 6'sı
+  yakalandı; yakalanmayan (BP s1'de satır karosu h yerine geçiş sayısından) D90'ın H ≤ 16 sınırı içinde eşdeğer:
+  desteklenen her ağda iki sayı da 1 karo.
 - **Durum:** Claude, 04.11.
 
 ---

@@ -8,15 +8,17 @@
 #                     (D76; vektorler models/sistem/adim5_vektorleri/, ag1 ve ag2)
 #    tb_on_getirme  : veri/agirlik tamponlari + on_getirme (GMS'li), dizili sistem golden'inin izine karsi (D90)
 #    tb_dizi_motoru : dizi motoru (on-getirme + dizi + grup + LMS + yazma), golden'in komut listesiyle; son
-#                     tampon golden'in son haliyle (D91; ag1, ag2, ag3)
+#                     tampon golden'in son haliyle (D91; ag1, ag2, ag3, ag4)
+#    tb_fsm_dizi    : master_controller_dizi, golden'in komut listesine karsi (D92)
 #  Kullanim:
 #    1) Vivado'yu ac. Acik bir proje varsa kapat (File > Close Project).
 #    2) Tcl Console'a yaz:   source C:/.../final/rtl/dizi/run_sim.tcl
 #  Beklenen (OZET basligi altinda):
 #    SONUC tb_pe_dizi: PASS 2363392/2363392 (400 komut, 16x16)
 #    SONUC tb_grup_kurucu: PASS 664/664 (2 ag, 648 grup)
-#    SONUC tb_on_getirme: PASS 489430/489430 (3 ag, 306 DIZI komutu)
-#    SONUC tb_dizi_motoru: PASS 2841/2841 (3 ag, 306 DIZI komutu, 2784 kelime)
+#    SONUC tb_on_getirme: PASS 890446/890446 (4 ag, 602 DIZI komutu)
+#    SONUC tb_dizi_motoru: PASS 4000/4000 (4 ag, 602 DIZI komutu, 3926 kelime)
+#    SONUC tb_fsm_dizi: PASS 7998/7998 (4 ag, 799 komut)
 #  Sure: tb_pe_dizi komut satirindaki XSIM'de ~4 dk (512 PE simule ediliyor), tb_grup_kurucu kisa.
 #  Script bu klasorde gecici bir proje (vivado_sim/) kurar ve sonunda kapatir. tb_grup_kurucu'da
 #  dalga penceresi acilmaz (Vivado'nun dalga gorunumu bu testbench'te cokuyordu, arac tuzagi 13).
@@ -42,11 +44,11 @@ if {[file exists $pdir]} {
 create_project -force $pad $pdir
 
 set rtl [list "$repo/rtl/pe/mac.v" "$repo/rtl/pe/pe_birlesik.v" "$repo/rtl/sistem/psum_fifo.v" \
-              "$kok/pe_dizi.v" "$kok/grup_kurucu.v" "$repo/rtl/clu/max_tree.v"               "$kok/veri_tamponu.v" "$kok/agirlik_tamponu.v" "$kok/on_getirme.v" "$kok/dizi_motoru.v"]
+              "$kok/pe_dizi.v" "$kok/grup_kurucu.v" "$repo/rtl/clu/max_tree.v"               "$kok/veri_tamponu.v" "$kok/agirlik_tamponu.v" "$kok/on_getirme.v" "$kok/dizi_motoru.v" "$kok/master_controller_dizi.v"]
 add_files -norecurse [concat $rtl [glob "$repo/rtl/sru/*.v"]]
 
 set ozet {}
-foreach tb {tb_pe_dizi tb_grup_kurucu tb_on_getirme tb_dizi_motoru} {
+foreach tb {tb_pe_dizi tb_grup_kurucu tb_on_getirme tb_dizi_motoru tb_fsm_dizi} {
     set ss "sim_$tb"
     create_fileset -simset $ss
     add_files -fileset $ss -norecurse [list "$kok/$tb.sv"]
