@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D94**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D95**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -1019,6 +1019,38 @@ belgede. Özet:
 - **Süre (çevrim, eğitim adımı başına):** ag1 2448 (Adım 4'ün tek PE'li sistemi 25.434), ag2 3608 (Adım 4: 48.828),
   ag3 5614, ag4 9450.
 - **Durum:** Claude, 04.11. `dizi/run_sim.tcl` gerçek bölücü IP'siyle (Adım 4'ün script'iyle aynı IP üretimi).
+
+## Adım 5c — Donanımlaştırma (05.11.2026, `final/`)
+
+3f'nin sentezi (04.11 gece): `pe_dizi` tek başına LUT 251.531, DSP 2304, BRAM 0, sentez sonrası WNS +1,067 ns
+(200 MHz), vektörsüz güç 13,6 W. Sistemin geri kalanı (`pe_dizi` kara kutu; `-directive RuntimeOptimized
+-no_timing_driven`, varsayılan ayarla Timing Optimization 2 sa 13 dk'da bitmedi) LUT 1.498.830 (VC709'un %346'sı),
+RAMB36 496 (448'i BP s2 kayıt belleği), DSP 31, WNS −55 ns. `[Ölçüldü]` (`final/rtl/dizi/sentez.tcl`, raporlar
+`sentez_cikti/`, git dışı). Nedenler (kodda): değişkene bölmeler (`/ s`), `adres()`'teki 32 bit değişkenli
+çarpmalar, ön-getirmenin 256'ya 1 mux'lu saatsiz akışı. RTL simülasyonda bit bit doğru ama bu yazımla FPGA'ya
+sığmıyor. Plan: (e) döngü sırası, (a) sabitler register'da, (b) sayaçlı adres, (c) kaydırmalı line buffer
+(WMAX 32), (d) BP s2 kayıt belleği. Her adımda davranış aynı kalır, 6 testbench bit bit.
+
+### D94 — FP/BP'de toplanan kanal döngüsü en içte (Psum FIFO derinliği batch'ten bağımsız)
+- **Ne:** D85'in karo döngüleri: FP `o-karo → b → r-karo → c` (önceden `o-karo → c → b → r-karo`), BP
+  `c-karo → b → m/p-karo → o` (önceden `c-karo → o → b → m/p-karo`). WG ve WU değişmedi. `ilk` / `son` aynı
+  (toplanan kanalın ilki / sonuncusu). `master_controller_dizi.v`'de sayaç iç içeliği FP/BP için k1 en içte;
+  golden `dizi_sistem_golden.py` `is_komutlari()`.
+- **Neden:** Eski sırada toplanan kanal batch'in ve satır karosunun dışındaydı: her PE bir sonraki kanal gelene
+  kadar bütün batch'in kısmi toplamlarını tutmalıydı, B × ⌈Ho/16⌉ × T kayıt. Test ağlarında ≤ 48 (FIFO 64),
+  CIFAR VGG16 benzeri ağda (batch 256, 32×32) ≈ 256 × 2 × 34 ≈ 17.400 kayıt, PE başına; hiçbir FPGA'ya sığmaz.
+  Yeni sırada PE başına en çok bir geçişin çıkışları bekler (T ≤ W + 4), batch'ten bağımsız. Çevrim maliyeti yok:
+  ön-getirme her geçişte zaten yeni bir harita ve sütun ağırlıkları yüklüyor (D90).
+- **Kanıt:** `[PDF tam]` III-A: "The Psum FIFO queue saves the partial sum of convolution until the final outputs
+  are obtained" (PE içinde, Fig. 2); döngü sırasını Shao vermiyor. `[Çıkarım]` PE içi bir kuyruğun batch'le
+  büyümemesi gerekir. `[Ölçüldü]` golden: PE başına en çok bekleyen geçiş 1 (ag1–ag4; eski sırada B × karo).
+  Beklenen veri ve ağırlık dosyaları değişmedi (yalnızca `komutlar_dizi.txt`, `onget_izi.txt`). XSIM CLI:
+  `tb_fsm_dizi` 7998/7998, `tb_on_getirme` 890446/890446, `tb_dizi_motoru` 4000/4000, `tb_sistem_dizi`
+  4829/4829, 21120 çevrim (önceki sırayla aynı). Eski FSM yeni vektörlere karşı: 730 hata / 7998 (test sırayı
+  yakalıyor). `tb_pe_dizi`, `tb_grup_kurucu` bu değişiklikten etkilenmiyor (kendi vektörleri).
+- **FIFO derinliği (D12, D74):** 64 kalıyor; T ≤ 64 olan her harita için batch'ten bağımsız yeter (WMAX 32'de
+  T ≤ 36). (c) adımında WMAX'e göre yeniden boyutlanacak.
+- **Durum:** Claude, 05.11.
 
 ---
 

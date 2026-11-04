@@ -146,8 +146,8 @@ Adım 4'ün 10 alanlı biçimi korunuyor (`op faz katman b x y z a1 a2 a3`). KOP
 | 7 | BİTTİ | — |
 
 Döngüler (D47'nin dizi hâli; test ağlarında bütün karolar tek):
-- FP: o karosu → c → b → r karosu (ilk = c == 0, son = c == Cin − 1)
-- BP: c karosu → o → b → m (s1) / p (s2) karosu
+- FP: o karosu → b → r karosu → c (ilk = c == 0, son = c == Cin − 1); D94 (05.11), önceden o karosu → c → b → r karosu
+- BP: c karosu → b → m (s1) / p (s2) karosu → o; D94, önceden c karosu → o → b → m/p karosu
 - WG: c karosu → o karosu → b → r (ilk = b, r ilk; son = b, r son)
 
 `master_controller.v` bu döngülerle yeniden yazılacak; golden (`dizi_golden.py`) komut listesini üretip

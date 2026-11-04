@@ -11,6 +11,10 @@
 #    sistem : sistem_dizi, pe_dizi kara kutu (FSM, on-getirme, motor, tamponlar, CLU + bolucu IP, WU)
 #  Tam sistemin kaynagi = iki parcanin toplami (pe_dizi'nin sinirindaki yollar her iki parcada da yarim).
 #  Uygulama (place + route + guc): asama "dizi_uygulama" / "sistem_uygulama" (sentez checkpoint'inden).
+#  Hizli sentez (hizli = 1, "sistem" asamasinda varsayilan): -directive RuntimeOptimized -no_timing_driven.
+#    Neden (04.11): "sistem" parcasinin varsayilan sentezi Timing Optimization asamasinda 2 sa 13 dk ilerlemedi,
+#    bellek tepe 13,2 GB (on_getirme'nin saatsiz akisi: yazmac olarak kurulan satir tamponlari + 256'ya 1 mux'lar).
+#    Bu ayar kaynak sayisi icindir; gercek zamanlama place & route'tan alinir. Kapatmak icin: set hizli 0
 #  Kullanim (Vivado Tcl Console ya da vivado -mode batch -source sentez.tcl):
 #      set asama dizi ; source .../final/rtl/dizi/sentez.tcl
 #  Ciktilar: final/rtl/dizi/sentez_cikti/ (raporlar ve checkpoint'ler; git disi)
@@ -22,6 +26,8 @@ set repo  [file dirname [file dirname $kok]]
 set cikti "$kok/sentez_cikti"
 set parca xc7vx690tffg1761-2
 if {![info exists asama]} { set asama dizi }
+if {![info exists hizli]} { set hizli [expr {$asama eq "sistem"}] }
+set sentez_ek [expr {$hizli ? {-directive RuntimeOptimized -no_timing_driven} : {}}]
 file mkdir $cikti
 set_param general.maxThreads 4
 
@@ -44,7 +50,7 @@ if {$asama eq "dizi"} {
     create_project -in_memory -part $parca
     read_verilog [list "$kok/pe_dizi.v" "$repo/rtl/pe/mac.v" "$repo/rtl/pe/pe_birlesik.v" "$repo/rtl/sistem/psum_fifo.v"]
     saat_xdc $cikti
-    synth_design -top pe_dizi -part $parca -mode out_of_context -flatten_hierarchy rebuilt
+    synth_design -top pe_dizi -part $parca -mode out_of_context -flatten_hierarchy rebuilt {*}$sentez_ek
     write_checkpoint -force "$cikti/dizi_sentez.dcp"
     raporla $cikti dizi_sentez
     puts "SENTEZ BITTI (dizi): $cikti"
@@ -85,7 +91,7 @@ endmodule}
     set_property generate_synth_checkpoint false [get_files div_gen_0Z.xci]
     generate_target all [get_files div_gen_0Z.xci]
     saat_xdc $cikti
-    synth_design -top sistem_dizi -part $parca -mode out_of_context -flatten_hierarchy rebuilt
+    synth_design -top sistem_dizi -part $parca -mode out_of_context -flatten_hierarchy rebuilt {*}$sentez_ek
     write_checkpoint -force "$cikti/sistem_sentez.dcp"
     raporla $cikti sistem_sentez
     puts "SENTEZ BITTI (sistem): $cikti"

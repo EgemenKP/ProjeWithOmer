@@ -132,18 +132,20 @@ def hedef_genislik(faz):
 def is_komutlari(K, faz, l):
     k = S.KATMANLAR[l - 1]
     K.append([OP_IS_BASLA, faz, l, 0, hedef_genislik(faz), 0, 0, 0, 0, 0])
-    if faz == FAZ_FP:                              # o-karo -> c -> b -> r-karo
+    # D94: toplanan kanal döngüsü (FP'de c, BP'de o) en içte; Psum FIFO yalnızca bir geçişin çıkışlarını tutar
+    # (derinlik T, batch'ten bağımsız). Eski sıra (kanal b ve karonun dışında) B × karo × T kayıt istiyordu.
+    if faz == FAZ_FP:                              # o-karo -> b -> r-karo -> c
         for k0 in range(tavan(k["cout"], NB)):
-            for c in range(k["cin"]):
-                for b in range(S.BATCH):
-                    for z in range(tavan(k["ho"], NB)):
+            for b in range(S.BATCH):
+                for z in range(tavan(k["ho"], NB)):
+                    for c in range(k["cin"]):
                         K.append([OP_DIZI, faz, l, b, k0, c, z, int(c == 0), int(c == k["cin"] - 1), 0])
-    elif faz == FAZ_BP:                            # c-karo -> o -> b -> m/p-karo
+    elif faz == FAZ_BP:                            # c-karo -> b -> m/p-karo -> o
         n = k["h"] if k["s"] == 1 else S.bp_gecis_sayisi(k)
         for k0 in range(tavan(k["cin"], NB)):
-            for o in range(k["cout"]):
-                for b in range(S.BATCH):
-                    for z in range(tavan(n, NB)):
+            for b in range(S.BATCH):
+                for z in range(tavan(n, NB)):
+                    for o in range(k["cout"]):
                         K.append([OP_DIZI, faz, l, b, k0, o, z, int(o == 0), int(o == k["cout"] - 1), 0])
     else:                                          # c-karo -> o-karo -> b -> r
         for k0 in range(tavan(k["cin"], NB)):
@@ -190,6 +192,8 @@ class Is:
 
     def fifo_yaz(self, ij, anahtar, v):
         self.fifo.setdefault(ij, []).append((anahtar, v))
+        global FIFO_EN_COK                         # D94: PE başına en çok bekleyen geçiş sayısı
+        FIFO_EN_COK = max(FIFO_EN_COK, len(self.fifo[ij]))
 
     def fifo_oku(self, ij, anahtar):
         a, v = self.fifo[ij].pop(0)
@@ -207,6 +211,7 @@ def lms_yaz(T, J, ad, b, karo, r, x, grup, anahtar, islem=None):
     J.olay[anahtar] = (M, l)
 
 
+FIFO_EN_COK = 0    # D94: ölçüm (Is.fifo_yaz)
 IZ = None          # liste verilirse her DİZİ komutunun ön-getirme izi buraya eklenir (onget_izi.txt)
 
 
@@ -531,7 +536,7 @@ def calistir(ag, klasor):
     S.yaz_ag(os.path.join(klasor, "ag_yapilandirma.txt"))
     with open(os.path.join(klasor, "etiket.txt"), "w") as f:      # CLU'nun doğru sınıfları (örnek sırasıyla)
         f.write(" ".join(str(y) for y in etiket) + "\n")
-    print(f"[{ad}] Vektörler yazıldı: {klasor}/")
+    print(f"[{ad}] Vektörler yazıldı: {klasor}/ (PE başına en çok bekleyen Psum geçişi: {FIFO_EN_COK})")
     return komutlar, T
 
 

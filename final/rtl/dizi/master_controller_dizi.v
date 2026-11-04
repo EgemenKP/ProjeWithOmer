@@ -8,7 +8,8 @@
 //    GERİ   katman L..1 : (l > 1 ise) İŞ_BAŞLA, DİZİ, ÖLÇEK; sonra İŞ_BAŞLA, DİZİ, ÖLÇEK, WU'lar
 //    BİTTİ
 //  Fark (D78, D85): KOPYA yok (GMS ön-getirmede); PE komutunun yerine DİZİ geçiş komutu, karo döngüleri:
-//    FP: o-karo -> c -> b -> r-karo      BP: c-karo -> o -> b -> m/p-karo      WG: c-karo -> o-karo -> b -> r
+//    FP: o-karo -> b -> r-karo -> c      BP: c-karo -> b -> m/p-karo -> o      WG: c-karo -> o-karo -> b -> r
+//    (D94, 05.11: FP/BP'de toplanan kanal en içte; önceden b ve karonun dışındaydı, FIFO B × karo × T isterdi)
 //    WU: o-karo -> c (bir komut 9 kelime)
 //  Karo sayısı ceil(n / 16). Komut alanları (komutlar_dizi.txt ile aynı sıra):
 //    0 op, 1 faz, 2 katman, 3 b, 4 x, 5 y, 6 z, 7 a1, 8 a2, 9 a3
@@ -106,9 +107,26 @@ module master_controller_dizi #(
     wire son_k3    = (k3 == n3 - 1'b1);
     wire dongu_son = son_k0 & son_k1 & son_k2 & son_k3;
 
+    // D94: FP/BP'de toplanan kanal (k1) en içte: k0 -> k2 (b) -> k3 (karo) -> k1. Diğerleri: k0 -> k1 -> k2 -> k3.
+    wire kanal_icte = (durum == D_DIZI) && (faz != FAZ_WG);
     reg [CW-1:0] k0_s, k1_s, k2_s, k3_s;
     always @* begin
         k0_s = k0; k1_s = k1; k2_s = k2; k3_s = k3;
+        if (kanal_icte) begin
+            if (!son_k1) k1_s = k1 + 1'b1;
+            else begin
+                k1_s = 0;
+                if (!son_k3) k3_s = k3 + 1'b1;
+                else begin
+                    k3_s = 0;
+                    if (!son_k2) k2_s = k2 + 1'b1;
+                    else begin
+                        k2_s = 0;
+                        k0_s = son_k0 ? {CW{1'b0}} : k0 + 1'b1;
+                    end
+                end
+            end
+        end else
         if (!son_k3) k3_s = k3 + 1'b1;
         else begin
             k3_s = 0;
