@@ -114,6 +114,7 @@ module tb_fsm_dizi_govde;
         ag_kos("ag2/");
         ag_kos("ag3/");
         ag_kos("ag4/");
+        ag_kos("ag5/");
         if (hata == 0) $display("SONUC tb_fsm_dizi: PASS %0d/%0d (%0d ag, %0d komut)", kontrol, kontrol, n_ag, n_kom);
         else           $display("SONUC tb_fsm_dizi: FAIL %0d hata / %0d", hata, kontrol);
         sfd = $fopen({dizin, "sonuc_tb_fsm_dizi.txt"}, "w");

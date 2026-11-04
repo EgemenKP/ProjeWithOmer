@@ -16,7 +16,7 @@
 //    3) AKIŞ: T çevrim; PE satırı i'nin akis1/2/3'ü ve sütun j'nin hattı (FP/BP: ağırlık; WG: alt 24 bit
 //            hata, D73) satır register'larından, dolgu / çift-tek / sıfır ekleme burada yapılarak.
 //            Akışın t. çevriminde golden'ın t. çevrim girişi (D66). Etkin olmayan satır/sütun 0.
-//  Golden: dizi_sistem_golden.py (onget_izi.txt). Sınır: H <= HMAX, W <= WMAX (D84, test ağı).
+//  Golden: dizi_sistem_golden.py (onget_izi.txt). Sınır: W <= WMAX = 32 (D97; önceden H, W <= 16, D84/D90).
 //
 //  Yapılandırma (katman li = l − 1, [8*li +: 8]): cfg_cin, cfg_cout, cfg_h, cfg_w, cfg_s, cfg_p.
 //  Bölge tabanları ve G'ler (indis l = 0..LMAX): taban_akt/taban_hata/taban_agr [AW*l +: AW],
@@ -29,8 +29,8 @@ module on_getirme #(
     parameter NB   = 16,
     parameter AW   = 9,
     parameter LMAX = 4,
-    parameter HMAX = 16,
-    parameter WMAX = 16
+    parameter HMAX = 32,           // D97: yalnızca belge (pencere H'den bağımsız)
+    parameter WMAX = 32            // D97 (önceden 16)
 ) (
     input  wire                     clk,
     input  wire                     rst,
@@ -186,25 +186,97 @@ module on_getirme #(
         end
     endgenerate
 
-    // ---- Satır register'ları ----
-    reg [7:0]   LR  [0:HMAX*WMAX-1];   // FP/BP: kanalın haritası
-    reg [127:0] LRW [0:3*WMAX-1];      // WG: 3 aktivasyon satırı, x başına 16 kanal (PE satırları)
-    reg [127:0] LE  [0:WMAX-1];        // WG: hata satırı, x başına 16 kanal (sütunlar)
-    reg [71:0]  WR  [0:15];            // sütun ağırlıkları (PE'ye yüklenen hâli)
-    integer q;
-    initial begin
-        for (q = 0; q < HMAX*WMAX; q = q + 1) LR[q] = 8'd0;
-        for (q = 0; q < 3*WMAX; q = q + 1)    LRW[q] = 128'd0;
-        for (q = 0; q < WMAX; q = q + 1)      LE[q] = 128'd0;
-        for (q = 0; q < 16; q = q + 1)        WR[q] = 72'd0;
-    end
-
     // ---- Okuma sayaçları ve yakalama boru hattı (okuma verisi 1 çevrim sonra) ----
     reg [7:0] sx, stur;                 // x ve tur (FP/BP: satır grubu; AGR: sıra)
     reg       yak_gec;                  // bu çevrim yakalanacak veri var
     reg [2:0] yak_durum;
     reg [7:0] yak_x, yak_tur;
     integer   kk, rr, xx, ii, jj, idx;
+
+    // ---- D97 (Adım 5c-c): line buffer ----
+    // FP/BP: haritanın tamamı yerine geçişin ihtiyaç duyduğu satır penceresi tutulur: yerel satır K = harita satırı
+    // − taban_satir (komut sabiti). Her yerel satır kendi küçük belleğinde (W kelime × 8 bit, dağıtık RAM; bir
+    // yazma, iki okuma portu). Akışta PE satırı i'nin 3 tap'i sabit yerel satırlardan okunur (FP/BP s1: i + q,
+    // FP s2: 2i + q, BP s2: q = 2 ? i : i + 1); okunan sütun t'den (iki port: s2'de çift ve tek sütun).
+    // Pencere dışı / harita dışı satır (r_satir_gec) ve harita dışı sütun 0 verir. Önceden harita H×W'lık bir
+    // yazmaç dizisindeydi ve her tap 256'ya 1 mux'tan okunuyordu (H, W <= 16).
+    // WG: 3 aktivasyon satırı (q) ve hata satırı da birer bellek (W × 128 bit).
+    localparam LP = 33;                                       // pencere: FP s2'de 2·15 + 2 + 1 satır
+    reg signed [12:0] g_taban_satir, r_taban_satir;
+    reg [LP-1:0]      g_satir_gec, r_satir_gec;
+    reg [11:0]        g_RH;
+    integer gk3, g_g;
+    always @* begin
+        case ({faz == 2'd1, g_s2})
+            2'b00:   g_taban_satir = $signed({1'b0, z, 4'd0}) - $signed({1'b0, g_p});            // FP s1
+            2'b01:   g_taban_satir = $signed({1'b0, z, 5'd0}) - $signed({1'b0, g_p});            // FP s2
+            2'b10:   g_taban_satir = $signed({1'b0, z, 4'd0}) - 13'sd2 + $signed({1'b0, g_p}); // BP s1
+            default: g_taban_satir = $signed({1'b0, z, 4'd0}) - 13'sd1;                          // BP s2
+        endcase
+        g_RH = (faz == 2'd1) ? g_ho : {4'd0, g_h};
+        for (gk3 = 0; gk3 < LP; gk3 = gk3 + 1) begin
+            g_g = g_taban_satir + gk3;
+            g_satir_gec[gk3] = (g_g >= 0) && (g_g < $signed({1'b0, g_RH}));
+        end
+    end
+    always @(posedge clk) if (durum == D_BOS && basla) begin
+        r_taban_satir <= g_taban_satir;
+        r_satir_gec   <= g_satir_gec;
+    end
+
+    // yakalanan SATIR kelimesinden pencereye yazma: bank kk = harita satırı 16·tur + kk -> K = 16·tur + kk − taban
+    reg [8*NB-1:0] kb;                                        // bank başına kanalın baytı
+    reg [LP-1:0]   lb_yaz;
+    reg [8*LP-1:0] lb_veri;
+    integer kw, dw;
+    always @* begin
+        for (kw = 0; kw < NB; kw = kw + 1) kb[8*kw +: 8] = gms_cikis[128*kw + 8*kk1[3:0] +: 8];
+        lb_yaz = {LP{1'b0}}; lb_veri = {8*LP{1'b0}};
+        if (yak_gec && yak_durum == D_SATIR && fz != 2'd2)
+            for (kw = 0; kw < LP; kw = kw + 1) begin
+                dw = r_taban_satir + kw - $signed({1'b0, yak_tur, 4'd0});
+                if (dw >= 0 && dw < 16 && r_satir_gec[kw]) begin
+                    lb_yaz[kw] = 1'b1;
+                    lb_veri[8*kw +: 8] = kb[8*dw[3:0] +: 8];
+                end
+            end
+    end
+
+    reg  [7:0]        lb_a1, lb_a2;                           // akışın okuduğu sütunlar
+    wire [8*LP-1:0]   lb_o1, lb_o2;
+    wire [3*128-1:0]  lw_o1, lw_o2;
+    wire [127:0]      le_o;
+    wire lw_yaz = yak_gec && yak_durum == D_SATIR && fz == 2'd2;
+    wire le_yaz = yak_gec && yak_durum == D_HATA;
+    genvar gl;
+    generate
+        for (gl = 0; gl < LP; gl = gl + 1) begin : lb
+            reg [7:0] m [0:WMAX-1];
+            integer a0;
+            initial for (a0 = 0; a0 < WMAX; a0 = a0 + 1) m[a0] = 8'd0;
+            always @(posedge clk) if (lb_yaz[gl]) m[yak_x] <= lb_veri[8*gl +: 8];
+            assign lb_o1[8*gl +: 8] = m[lb_a1];
+            assign lb_o2[8*gl +: 8] = m[lb_a2];
+        end
+        for (gl = 0; gl < 3; gl = gl + 1) begin : lw
+            reg [127:0] m [0:WMAX-1];
+            integer a0;
+            initial for (a0 = 0; a0 < WMAX; a0 = a0 + 1) m[a0] = 128'd0;
+            always @(posedge clk) if (lw_yaz)
+                m[yak_x] <= r_q_gec[gl] ? gms_cikis[128*r_q_bank[gl] +: 128] : 128'd0;
+            assign lw_o1[128*gl +: 128] = m[lb_a1];
+            assign lw_o2[128*gl +: 128] = m[lb_a2];
+        end
+    endgenerate
+    reg [127:0] le_m [0:WMAX-1];
+    integer a1;
+    initial for (a1 = 0; a1 < WMAX; a1 = a1 + 1) le_m[a1] = 128'd0;
+    always @(posedge clk) if (le_yaz) le_m[yak_x] <= gms_cikis[128*zz[3:0] +: 128];
+    assign le_o = le_m[t];
+
+    reg [71:0]  WR  [0:15];            // sütun ağırlıkları (PE'ye yüklenen hâli)
+    integer q;
+    initial for (q = 0; q < 16; q = q + 1) WR[q] = 72'd0;
 
     // Okuma adresleri (saatsiz; D96: çarpım yok)
     integer ka, qa;
@@ -270,20 +342,7 @@ module on_getirme #(
                             if (yak_tur < nc) WR[yak_tur] <= w_donustur(a_oku_veri[72*(kk1 % 16) +: 72], 1, s);
                         end
                     end
-                    D_SATIR: begin
-                        if (fz != 2'd2) begin
-                            for (kk = 0; kk < NB; kk = kk + 1) begin
-                                rr = 16*yak_tur + kk;
-                                if (rr < RH) LR[rr*WMAX + yak_x] <= gms_cikis[128*kk + 8*(kanal % 16) +: 8];
-                            end
-                        end else begin
-                            for (q = 0; q < 3; q = q + 1) begin
-                                rr = (r_s2 ? 2*zz : zz) + q - p;
-                                LRW[q*WMAX + yak_x] <= (rr >= 0 && rr < RH) ? gms_cikis[128*(rr % 16) +: 128] : 128'd0;
-                            end
-                        end
-                    end
-                    D_HATA: LE[yak_x] <= gms_cikis[128*(zz % 16) +: 128];
+                    // D_SATIR / D_HATA: line buffer yazmaları ayrı bloklarda (lb, lw, le_m)
                     default: ;
                 endcase
             end
@@ -334,25 +393,40 @@ module on_getirme #(
         end
     end
 
-    // ---- Akış (saatsiz, t'den) ----
-    function [7:0] lr_oku;              // dolgu dışı / harita dışı -> 0
-        input integer satir, sutun, H_, W_;
+    // ---- Akış (saatsiz, t'den; D97: okunan sütunlar ve sabit kablolu tap'ler) ----
+    integer ti, c1, c2, cw;
+    reg     c1g, c2g;
+    always @* begin
+        ti = t;
+        c2 = -1;
+        case ({fz, r_s2})
+            3'b000:  c1 = ti - p;                                   // FP s1
+            3'b001:  begin c1 = 2*ti - p; c2 = 2*ti - 1 - p; end    // FP s2 (çift, tek)
+            3'b010:  c1 = ti - (2 - p);                             // BP s1
+            3'b011:  c1 = ti - 1;                                   // BP s2
+            3'b100:  c1 = ti - p;                                   // WG s1
+            default: begin c1 = 2*ti - p; c2 = 2*ti - 1 - p; end    // WG s2
+        endcase
+        cw  = (fz == 2'd2) ? w : RW;
+        c1g = (c1 >= 0) && (c1 < cw);
+        c2g = (c2 >= 0) && (c2 < cw);
+        lb_a1 = c1[7:0];
+        lb_a2 = c2[7:0];
+    end
+
+    function integer yerel;             // PE satırı i'nin q. tap'inin yerel satırı
+        input [2:0] md;
+        input integer i_, q_;
         begin
-            if (satir >= 0 && satir < H_ && sutun >= 0 && sutun < W_) lr_oku = LR[satir*WMAX + sutun];
-            else lr_oku = 8'd0;
+            case (md)
+                3'd1:    yerel = 2*i_ + q_;
+                3'd3:    yerel = (q_ == 2) ? i_ : i_ + 1;
+                default: yerel = i_ + q_;
+            endcase
         end
     endfunction
 
-    function [7:0] lrw_oku;             // WG: satır q, sütun, kanal (PE satırı) ch
-        input integer qq, sutun, W_, ch;
-        reg [127:0] k;
-        begin
-            if (sutun >= 0 && sutun < W_) begin k = LRW[qq*WMAX + sutun]; lrw_oku = k[8*ch +: 8]; end
-            else lrw_oku = 8'd0;
-        end
-    endfunction
-
-    integer ti, ri, pi, is_, js_, qs;
+    integer is_, js_, qs, kq;
     reg [7:0] ev;
     always @* begin
         satir_akis1_flat = {NB*24{1'b0}};
@@ -361,7 +435,6 @@ module on_getirme #(
         sutun_w_flat     = {NB*72{1'b0}};
         mod = 3'd6;
         if (durum == D_AKIS) begin
-            ti = t;
             case (fz)
                 2'd0: mod = (s == 1) ? 3'd0 : 3'd1;
                 2'd1: mod = (s == 1) ? 3'd2 : 3'd3;
@@ -369,28 +442,20 @@ module on_getirme #(
             endcase
             for (is_ = 0; is_ < 16; is_ = is_ + 1) if (is_ < nr) begin
                 for (qs = 0; qs < 3; qs = qs + 1) begin
-                    case (mod)
-                        3'd0: begin ri = 16*zz + is_;
-                            satir_akis1_flat[24*is_ + 8*qs +: 8] = lr_oku(ri + qs - p, ti - p, RH, RW); end
-                        3'd1: begin ri = 16*zz + is_;
-                            satir_akis1_flat[24*is_ + 8*qs +: 8] = lr_oku(2*ri + qs - p, 2*ti - p, RH, RW);
-                            if (ti >= 1) satir_akis2_flat[24*is_ + 8*qs +: 8] = lr_oku(2*ri + qs - p, 2*ti - 1 - p, RH, RW); end
-                        3'd2: begin ri = 16*zz + is_;
-                            satir_akis1_flat[24*is_ + 8*qs +: 8] = lr_oku(ri + qs - (2 - p), ti - (2 - p), RH, RW); end
-                        3'd3: begin pi = 16*zz + is_;
-                            satir_akis1_flat[24*is_ + 8*qs +: 8] = lr_oku((qs == 2) ? pi - 1 : pi, ti - 1, RH, RW); end
-                        3'd4: satir_akis1_flat[24*is_ + 8*qs +: 8] = lrw_oku(qs, ti - p, w, is_);
-                        default: begin
-                            satir_akis1_flat[24*is_ + 8*qs +: 8] = lrw_oku(qs, 2*ti - p, w, is_);
-                            if (ti >= 1) satir_akis2_flat[24*is_ + 8*qs +: 8] = lrw_oku(qs, 2*ti - 1 - p, w, is_);
-                        end
-                    endcase
+                    if (fz != 2'd2) begin
+                        kq = yerel(mod, is_, qs);
+                        if (c1g && r_satir_gec[kq]) satir_akis1_flat[24*is_ + 8*qs +: 8] = lb_o1[8*kq +: 8];
+                        if (c2g && r_satir_gec[kq]) satir_akis2_flat[24*is_ + 8*qs +: 8] = lb_o2[8*kq +: 8];
+                    end else begin
+                        if (c1g) satir_akis1_flat[24*is_ + 8*qs +: 8] = lw_o1[128*qs + 8*is_ +: 8];
+                        if (c2g) satir_akis2_flat[24*is_ + 8*qs +: 8] = lw_o2[128*qs + 8*is_ +: 8];
+                    end
                 end
             end
             for (js_ = 0; js_ < 16; js_ = js_ + 1) if (js_ < nc) begin
                 if (fz != 2'd2) sutun_w_flat[72*js_ +: 72] = WR[js_];
                 else begin
-                    ev = (ti < wo) ? LE[ti][8*js_ +: 8] : 8'd0;
+                    ev = (t < wo) ? le_o[8*js_ +: 8] : 8'd0;
                     sutun_w_flat[72*js_ +: 24] = {ev, ev, ev};
                 end
             end

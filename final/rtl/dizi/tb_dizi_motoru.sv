@@ -20,7 +20,7 @@ endmodule
 
 module tb_dizi_motoru_govde;
 
-    localparam NB = 16, AW = 9, LMAX = 4;
+    localparam NB = 16, AW = 9, LMAX = 8;
 
     reg clk = 1'b0;
     always #5 clk = ~clk;
@@ -228,6 +228,7 @@ module tb_dizi_motoru_govde;
         ag_kos("ag2/");
         ag_kos("ag3/");
         ag_kos("ag4/");
+        ag_kos("ag5/");
         if (hata == 0) $display("SONUC tb_dizi_motoru: PASS %0d/%0d (%0d ag, %0d DIZI komutu, %0d kelime)", kontrol, kontrol, n_ag, n_dizi, n_kelime);
         else           $display("SONUC tb_dizi_motoru: FAIL %0d hata / %0d", hata, kontrol);
         sfd = $fopen({dizin, "sonuc_tb_dizi_motoru.txt"}, "w");

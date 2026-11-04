@@ -21,10 +21,11 @@
 #    BOLUCU: gercek IP (...)
 #    SONUC tb_pe_dizi: PASS 2363392/2363392 (400 komut, 16x16)
 #    SONUC tb_grup_kurucu: PASS 664/664 (2 ag, 648 grup)
-#    SONUC tb_on_getirme: PASS 890446/890446 (4 ag, 602 DIZI komutu)
-#    SONUC tb_dizi_motoru: PASS 4000/4000 (4 ag, 602 DIZI komutu, 3926 kelime)
-#    SONUC tb_fsm_dizi: PASS 7998/7998 (4 ag, 799 komut)
-#    SONUC tb_sistem_dizi: PASS 4829/4829 (4 ag, 4774 kelime, 21120 cevrim)
+#    SONUC tb_on_getirme: PASS 1595333/1595333 (5 ag, 759 DIZI komutu)
+#    SONUC tb_dizi_motoru: PASS 10001/10001 (5 ag, 759 DIZI komutu, 9892 kelime)
+#    SONUC tb_fsm_dizi: PASS 10230/10230 (5 ag, 1022 komut)
+#    SONUC tb_sistem_dizi: PASS 10961/10961 (5 ag, 10884 kelime, 34584 cevrim)
+#  (05.11, D97 sonrasi, ag5 dahil; davranissal bolucuyle XSIM CLI. Gercek IP'yle Vivado'da henuz kosulmadi.)
 #  Sure: tb_pe_dizi komut satirindaki XSIM'de ~4 dk (512 PE), digerleri birer-iki dakika.
 #  tb_pe_dizi disindaki testbench'lerin ust modulunde sinyal yok (govde alt modulde): Vivado'nun dalga
 #  gorunumu buyuk register'li testbench'lerde cokuyordu (arac tuzagi 13); boylece dalga penceresi acilmiyor.

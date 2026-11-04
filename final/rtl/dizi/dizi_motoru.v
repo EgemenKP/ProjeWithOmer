@@ -30,8 +30,8 @@ module dizi_motoru #(
     parameter NB   = 16,
     parameter AW   = 9,
     parameter LMAX = 4,
-    parameter HMAX = 16,
-    parameter WMAX = 16,
+    parameter HMAX = 32,           // D97
+    parameter WMAX = 32,           // D97 (önceden 16)
     parameter PS_DERINLIK = 64,
     parameter PS_AW = 6
 ) (

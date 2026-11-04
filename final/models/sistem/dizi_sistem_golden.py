@@ -559,11 +559,25 @@ AG4 = dict(ad="ag4", batch=2, tohum=99, katmanlar=[
 ])
 
 
+# AG5 (5c-c, D97): 32x32 giriş, H, W <= 32 (line buffer). 1. ve 2. katmanda FP/BP s1'de iki satır karosu (z = 1),
+# 3. katmanda FP s2'nin 33 satırlık penceresi ve BP s2'de 17 geçiş (z = 1: dX satırı 2z - 1 bloğu -> -W payı;
+# 16 <= e: +W payı), WG'de satır payı 1. Veri tamponu (AW = 9) için batch 1, 6 katman (LMAX >= 6).
+AG5 = dict(ad="ag5", batch=1, tohum=55, katmanlar=[
+    dict(cin=2, cout=3,  h=32, w=32, s=1, p=1, relu=1, sw=-8),
+    dict(cin=3, cout=4,  h=32, w=32, s=1, p=1, relu=1, sw=-8),
+    dict(cin=4, cout=4,  h=32, w=32, s=2, p=1, relu=1, sw=-8),
+    dict(cin=4, cout=5,  h=16, w=16, s=2, p=0, relu=1, sw=-8),
+    dict(cin=5, cout=6,  h=7,  w=7,  s=2, p=0, relu=1, sw=-8),
+    dict(cin=6, cout=10, h=3,  w=3,  s=1, p=0, relu=0, sw=-9),
+])
+
+
 def main(klasor="adim5_vektorleri"):
     calistir(S.AG1, klasor)
     calistir(S.AG2, os.path.join(klasor, "ag2"))
     calistir(AG3, os.path.join(klasor, "ag3"))
     calistir(AG4, os.path.join(klasor, "ag4"))
+    calistir(AG5, os.path.join(klasor, "ag5"))
     S.ag_kur(S.AG1)
 
 

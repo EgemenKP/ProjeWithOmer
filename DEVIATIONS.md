@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D97**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D98**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -1087,6 +1087,43 @@ sığmıyor. Plan: (e) döngü sırası, (a) sabitler register'da, (b) sayaçlı
   hep ilk blokta, eşdeğer. Aynı nedenle WG satır payı ve hata satırı payı bugünkü testlerde hep 0; bu yollar
   (c) adımının H = 32'lik test ağıyla kapsanacak.
 - **Durum:** Claude, 05.11.
+
+**Ara ölçüm, (a) + (b) sonrası sistem sentezi (05.11 gece):** aynı ayarlar (`pe_dizi` kara kutu, RuntimeOptimized,
+`-flatten_hierarchy none` ile modül başına doğru döküm; `sentez.tcl` `duzlestir`). LUT 1.498.830 → 1.315.312
+(−%12), TNS −656.210 → −208.706 ns, WNS −55,3 → −54,5 ns, RAMB36 ve DSP aynı (496 + 16 RAMB18, 31). Modül başına:
+`dizi_motoru`'nun kendi mantığı 930.251 LUT (toplamın %71'i; 448 RAMB36'lık BP s2 kayıt belleği de burada),
+`on_getirme` 127.357, 16 LMS + 32 GMS grubu ≈ 167.000, CLU 11.834, FSM 338. `[Ölçüldü]` Bu koşu (c)'yi içermiyor.
+Sonuç: asıl alan motorun yazma/seçme mantığında; (d) ve ardından motorun çıkış yolu ele alınmalı. Sentez 56 dk;
+sentez sonrası `report_power` iki koşuda da 25 dk'dan fazla ilerlemedi, durduruldu (güç place & route'tan alınacak).
+
+### D97 — Ön-getirmede satır başına line buffer, WMAX 32 (Adım 5c-c)
+- **Ne:** `on_getirme.v`: Haritanın tamamını tutan yazmaç dizisi (LR / LRW / LE) ve her tap'i 256'ya 1 mux'la okuyan
+  akış kaldırıldı. Yerine:
+  - **Pencere:** LP = 33 satırlık line buffer; satır K, harita satırı `taban + K`'yı tutar (FP s1 16z − p, FP s2
+    32z − p, BP s1 16z − 2 + p, BP s2 16z − 1). Her satır W × 8 bit bir bellek (1 yazma, 2 okuma portu: s2'de
+    çift ve tek sütun). Haritanın dışındaki satırlar (`r_satir_gec`, `basla`'da) 0 okunur.
+  - **Yazma:** SATIR okumasında bank k'nin kanal baytı, harita satırı 16·tur + k pencereye düşüyorsa satır
+    16·tur + k − taban'a, sütun x'e yazılır.
+  - **Okuma:** her çevrimde tek sütun (iki port), sütun t'den (FP s1 t − p, s2 2t − p ve 2t − 1 − p, BP s1
+    t − 2 + p, BP s2 t − 1). PE satırı i'nin q. tap'i sabit kablolu pencere satırına bağlı (s1 i + q, FP s2 2i + q,
+    BP s2 q = 2 ? i : i + 1). Mux yalnızca mod seçimi kadar.
+  - **WG:** 3 aktivasyon satırı ve hata satırı birer W × 128 bit bellek (`lw`, `le_m`).
+  - `WMAX` 16 → 32 (`on_getirme.v`, `dizi_motoru.v`); H için sınır yok (satır karoları). Test ağı AG5 (golden'da,
+    `adim5_vektorleri/ag5/`): 32×32 giriş, s1/s2, p 0/1, 6 katman, 223 komut. Testbench'lerde `LMAX` 4 → 8.
+- **Neden:** 3f sentezinde haritanın tamamı yazmaçtı ve her PE tap'i 256'ya 1 mux'tan okunuyordu; bu yapıyla
+  harita 16×16'dan büyüyemiyordu (CIFAR 32×32). Shao Fig. 2 / III-A: ön-getirme "line buffer" ile PE dizisine
+  satır satır veri akıtıyor. `[PDF şekil]` `[Çıkarım]` Satır başına bellek ve sabit kablolu tap'ler bu yapının
+  donanımdaki karşılığı.
+- **Kanıt:** `[Ölçüldü]` XSIM CLI (5 ağ): `tb_on_getirme` 1595333/1595333 (759 DIZI komutu), `tb_fsm_dizi`
+  10230/10230 (1022 komut), `tb_dizi_motoru` 10001/10001, `tb_sistem_dizi` 10961/10961 (34584 çevrim). Mutasyon
+  (yakalandı): BP s2 pencere tabanı −1 → 0 (5176 hata), BP s2 tap satırı (1856), pencere dışı satır 0'lanmıyor
+  (1642), WG'de geçersiz satır 0'lanmıyor (398), BP s1 sütun bir kayık (6572), motorda BP s2 ikinci bloğun +W payı
+  0 (1850; D96'da H ≤ 16 yüzünden kaçan mutant artık yakalanıyor).
+- **Bilinen sınır:** FP s2 penceresinin z ≥ 1 tabanı (32z − p) test edilmiyor: mutant (32z → 16z) yakalanmadı.
+  Bu yol yalnızca H ≥ 34'lük s2 katmanında çalışır (Ho > 16). Test ağlarında da VGG16 benzeri CIFAR ağında da
+  (D87) en büyük H 32, yani kullanılmıyor.
+- **PE Psum FIFO (D94):** T ≤ W + 4 = 36 ≤ 64; derinlik 64 kalıyor.
+- **Durum:** Claude, 05.11. Kaynak etkisi (c) + (d) sonrası sentezde ölçülecek.
 
 ---
 
