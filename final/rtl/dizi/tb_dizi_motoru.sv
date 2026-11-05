@@ -20,7 +20,7 @@ endmodule
 
 module tb_dizi_motoru_govde;
 
-    localparam NB = 16, AW = 9, LMAX = 8;
+    localparam NB = 16, AW = 13, LMAX = 15;   // D103: sentezle aynı
 
     reg clk = 1'b0;
     always #5 clk = ~clk;
@@ -30,8 +30,10 @@ module tb_dizi_motoru_govde;
     reg  [2:0]             hedef = 3'd7;
     reg  [1:0]             faz = 0;
     reg  [3:0]             l = 1;
-    reg  [7:0]             b = 0, k0 = 0, k1 = 0, z = 0;
-    reg  [LMAX*8-1:0]      cfg_cin = 0, cfg_cout = 0, cfg_h = 0, cfg_w = 0, cfg_s = 0, cfg_p = 0, cfg_relu = 0;
+    reg  [7:0]             b = 0, k0 = 0, z = 0;
+    reg  [15:0]            k1 = 0;
+    reg  [LMAX*16-1:0]     cfg_cin = 0, cfg_cout = 0;
+    reg  [LMAX*8-1:0]      cfg_h = 0, cfg_w = 0, cfg_s = 0, cfg_p = 0, cfg_relu = 0;
     reg  [(LMAX+1)*AW-1:0] taban_akt = 0, taban_hata = 0, taban_grad = 0, taban_agr = 0;
     reg  [(LMAX+1)*6-1:0]  G_akt = 0, G_hata = 0;
     reg  [(LMAX+1)*6-1:0]  G_grad = 0;
@@ -68,7 +70,8 @@ module tb_dizi_motoru_govde;
 
     integer kontrol = 0, hata = 0, n_ag = 0, n_dizi = 0, n_kelime = 0;
     integer fd, n, i, q, x, v, L, tmp, bank, adr, ll, bekle, hl_bas, hl_son;
-    integer kom [0:1023][0:9];
+    localparam KMAX = 32768;
+    integer kom [0:KMAX-1][0:9];       // D103: önceden 0:1023 (AG6 aşar)
     reg [8*16-1:0] ad;
     string dizin, yol;
     reg [133:0] kel;
@@ -98,7 +101,7 @@ module tb_dizi_motoru_govde;
         cfg_relu = 0;
         for (ll = 0; ll < L; ll = ll + 1) begin
             void'($fscanf(fd, "%d %d %d %d %d %d %d %d", i, q, n, x, tmp, v, adr, bank));
-            cfg_cin[8*ll +: 8] = i; cfg_cout[8*ll +: 8] = q; cfg_h[8*ll +: 8] = n; cfg_w[8*ll +: 8] = x;
+            cfg_cin[16*ll +: 16] = i; cfg_cout[16*ll +: 16] = q; cfg_h[8*ll +: 8] = n; cfg_w[8*ll +: 8] = x;
             cfg_s[8*ll +: 8] = tmp; cfg_p[8*ll +: 8] = v; cfg_relu[8*ll +: 8] = adr;
         end
         $fclose(fd);
@@ -160,6 +163,7 @@ module tb_dizi_motoru_govde;
         // ---- komutlar ----
         dosya_ac(alt, "komutlar_dizi.txt");
         void'($fscanf(fd, "%d", n));
+        if (n > KMAX) $fatal(1, "komut sayısı %0d > KMAX %0d", n, KMAX);
         for (i = 0; i < n; i = i + 1)
             for (q = 0; q < 10; q = q + 1) void'($fscanf(fd, "%d", kom[i][q]));
         $fclose(fd);
@@ -230,6 +234,7 @@ module tb_dizi_motoru_govde;
         ag_kos("ag3/");
         ag_kos("ag4/");
         ag_kos("ag5/");
+        ag_kos("ag6/");
         if (hata == 0) $display("SONUC tb_dizi_motoru: PASS %0d/%0d (%0d ag, %0d DIZI komutu, %0d kelime)", kontrol, kontrol, n_ag, n_dizi, n_kelime);
         else           $display("SONUC tb_dizi_motoru: FAIL %0d hata / %0d", hata, kontrol);
         sfd = $fopen({dizin, "sonuc_tb_dizi_motoru.txt"}, "w");

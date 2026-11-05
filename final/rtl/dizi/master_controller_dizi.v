@@ -21,19 +21,19 @@
 // =============================================================================
 module master_controller_dizi #(
     parameter AW        = 16,
-    parameter LMAX      = 8,
-    parameter CW        = 8,
+    parameter LMAX      = 15,          // D103 (önceden 8)
+    parameter CW        = 16,          // D103: sayaçlar 16 bit (kanal ≤ 511, batch 256; önceden 8)
     parameter HEDEF_AKT = 7
 ) (
     input  wire              clk,
     input  wire              rst,
     input  wire              basla,
     input  wire [3:0]        cfg_L,
-    input  wire [7:0]        cfg_batch,
+    input  wire [15:0]       cfg_batch,         // D103: 16 bit
     input  wire [3:0]        cfg_m_u,
     input  wire [7:0]        cfg_s_a0,
-    input  wire [LMAX*8-1:0] cfg_cin,
-    input  wire [LMAX*8-1:0] cfg_cout,
+    input  wire [LMAX*16-1:0] cfg_cin,          // D103: katman başına 16 bit
+    input  wire [LMAX*16-1:0] cfg_cout,
     input  wire [LMAX*8-1:0] cfg_h,
     input  wire [LMAX*8-1:0] cfg_w,
     input  wire [LMAX*8-1:0] cfg_s,
@@ -63,8 +63,8 @@ module master_controller_dizi #(
 
     // ---- Katman tablosu ----
     wire [3:0] li   = katman - 4'd1;
-    wire [7:0] cin  = cfg_cin [8*li +: 8];
-    wire [7:0] cout = cfg_cout[8*li +: 8];
+    wire [15:0] cin  = cfg_cin [16*li +: 16];
+    wire [15:0] cout = cfg_cout[16*li +: 16];
     wire [7:0] h    = cfg_h   [8*li +: 8];
     wire [7:0] s    = cfg_s   [8*li +: 8];
     wire [7:0] p    = cfg_p   [8*li +: 8];
@@ -77,9 +77,11 @@ module master_controller_dizi #(
     wire [9:0] np_s2 = ({2'b00, h} + {2'b00, p} + 10'd1) >> 1;
     wire [7:0] nbp   = (s == 8'd2) ? np_s2[7:0] : h;          // BP: s1'de dX satırı, s2'de geçiş (D51)
 
-    function [7:0] karo;                                       // ceil(n / 16)
-        input [7:0] n;
-        begin karo = (n + 8'd15) >> 4; end
+    // ceil(n / 16). D103 düzeltmesi: önceden 8 bitte n + 15 taşıyordu (n ≥ 241 -> karo(255) = 0).
+    function [15:0] karo;
+        input [15:0] n;
+        reg   [16:0] t;
+        begin t = {1'b0, n} + 17'd15; karo = t[16:4]; end
     endfunction
 
     // ---- Döngü sınırları ----

@@ -20,7 +20,7 @@ endmodule
 
 module tb_on_getirme_govde;
 
-    localparam NB = 16, AW = 9, LMAX = 8;
+    localparam NB = 16, AW = 13, LMAX = 15;   // D103: sentezle aynı
 
     reg clk = 1'b0;
     always #5 clk = ~clk;
@@ -29,8 +29,10 @@ module tb_on_getirme_govde;
     reg                    basla = 1'b0;
     reg  [1:0]             faz = 0;
     reg  [3:0]             l = 1;
-    reg  [7:0]             b = 0, k0 = 0, k1 = 0, z = 0;
-    reg  [LMAX*8-1:0]      cfg_cin = 0, cfg_cout = 0, cfg_h = 0, cfg_w = 0, cfg_s = 0, cfg_p = 0;
+    reg  [7:0]             b = 0, k0 = 0, z = 0;
+    reg  [15:0]            k1 = 0;
+    reg  [LMAX*16-1:0]     cfg_cin = 0, cfg_cout = 0;
+    reg  [LMAX*8-1:0]      cfg_h = 0, cfg_w = 0, cfg_s = 0, cfg_p = 0;
     reg  [(LMAX+1)*AW-1:0] taban_akt = 0, taban_hata = 0, taban_agr = 0;
     reg  [(LMAX+1)*6-1:0]  G_akt = 0, G_hata = 0;
 
@@ -66,7 +68,8 @@ module tb_on_getirme_govde;
     integer kontrol = 0, hata = 0, n_ag = 0, n_kayit_top = 0;
     integer bekle;
     integer fd, n, i, j, q, v, x, kn, md, TT, nr, nc, L, tmp, bank, adr, ll;
-    integer kom [0:1023][0:9];
+    localparam KMAX = 32768;
+    integer kom [0:KMAX-1][0:9];       // D103: önceden 0:1023 (AG6 aşar)
     integer ex_satir [0:15][0:63][0:8];
     integer ex_sutun [0:15][0:63];
     reg [8*16-1:0] ad;
@@ -96,7 +99,7 @@ module tb_on_getirme_govde;
         void'($fscanf(fd, "%d %d %d %d %d", L, tmp, tmp, tmp, tmp));
         for (ll = 0; ll < L; ll = ll + 1) begin
             void'($fscanf(fd, "%d %d %d %d %d %d %d %d", i, j, n, x, q, v, tmp, tmp));
-            cfg_cin[8*ll +: 8] = i; cfg_cout[8*ll +: 8] = j; cfg_h[8*ll +: 8] = n; cfg_w[8*ll +: 8] = x;
+            cfg_cin[16*ll +: 16] = i; cfg_cout[16*ll +: 16] = j; cfg_h[8*ll +: 8] = n; cfg_w[8*ll +: 8] = x;
             cfg_s[8*ll +: 8] = q; cfg_p[8*ll +: 8] = v;
         end
         $fclose(fd);
@@ -140,6 +143,7 @@ module tb_on_getirme_govde;
         // ---- komutlar ----
         dosya_ac(alt, "komutlar_dizi.txt");
         void'($fscanf(fd, "%d", n));
+        if (n > KMAX) $fatal(1, "komut sayısı %0d > KMAX %0d", n, KMAX);
         for (i = 0; i < n; i = i + 1)
             for (q = 0; q < 10; q = q + 1) void'($fscanf(fd, "%d", kom[i][q]));
         $fclose(fd);
@@ -211,6 +215,7 @@ module tb_on_getirme_govde;
         ag_kos("ag3/");
         ag_kos("ag4/");
         ag_kos("ag5/");
+        ag_kos("ag6/");
         if (hata == 0) $display("SONUC tb_on_getirme: PASS %0d/%0d (%0d ag, %0d DIZI komutu)", kontrol, kontrol, n_ag, n_kayit_top);
         else           $display("SONUC tb_on_getirme: FAIL %0d hata / %0d", hata, kontrol);
         sfd = $fopen({dizin, "sonuc_tb_on_getirme.txt"}, "w");

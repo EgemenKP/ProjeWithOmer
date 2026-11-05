@@ -28,8 +28,8 @@
 
 module dizi_motoru #(
     parameter NB   = 16,
-    parameter AW   = 9,
-    parameter LMAX = 4,
+    parameter AW   = 13,           // D103 (önceden 9)
+    parameter LMAX = 15,           // D103 (önceden 4)
     parameter HMAX = 32,           // D97
     parameter WMAX = 32,           // D97 (önceden 16)
     parameter PS_DERINLIK = 64,
@@ -43,14 +43,16 @@ module dizi_motoru #(
     input  wire                     basla,
     input  wire [1:0]               faz,
     input  wire [3:0]               l,
-    input  wire [7:0]               b, k0, k1, z,
+    input  wire [7:0]               b, k0, z,
+    input  wire [15:0]              k1,            // D103: FP/BP kanal (≤ 511), WG o-karo
     input  wire                     ilk, son,
     output reg                      bitti,
     output wire                     mesgul,
     output wire [5:0]               G_out,
     output wire                     ps_tasma, ps_eksik, ps_bos,
     // yapılandırma
-    input  wire [LMAX*8-1:0]        cfg_cin, cfg_cout, cfg_h, cfg_w, cfg_s, cfg_p, cfg_relu,
+    input  wire [LMAX*16-1:0]       cfg_cin, cfg_cout,     // D103: katman başına 16 bit
+    input  wire [LMAX*8-1:0]        cfg_h, cfg_w, cfg_s, cfg_p, cfg_relu,
     input  wire [(LMAX+1)*AW-1:0]   taban_akt, taban_hata, taban_grad, taban_agr,
     input  wire [(LMAX+1)*6-1:0]    G_akt, G_hata,
     // tamponlar
@@ -74,7 +76,7 @@ module dizi_motoru #(
     assign mesgul = (durum != M_BOS);
 
     // ---- komut ----
-    reg [1:0] fz;  reg [3:0] ll;  reg [7:0] bb, kk0, kk1, zz;  reg ilk_k, son_k;
+    reg [1:0] fz;  reg [3:0] ll;  reg [7:0] bb, kk0, zz;  reg [15:0] kk1;  reg ilk_k, son_k;
     reg [2:0] hedef;
     // D95 (Adım 5c-a): katmanın boyutları basla'da komut girişlerinden bir kez hesaplanıp register'da tutulur;
     // s ∈ {1, 2} -> "/ s" bir kaydırma (önceden her çevrim 32 bit değişkene bölme).
@@ -85,10 +87,11 @@ module dizi_motoru #(
     wire [11:0] g_w2p = {4'd0, g_w} + {3'd0, g_p, 1'b0};
     wire [11:0] g_ho  = g_s2 ? (((g_h2p - 12'd3) >> 1) + 12'd1) : (g_h2p - 12'd2);
     wire [11:0] g_wo  = g_s2 ? (((g_w2p - 12'd3) >> 1) + 12'd1) : (g_w2p - 12'd2);
-    reg [7:0] r_cin, r_cout, r_h, r_w, r_p, r_ho, r_wo;
+    reg [15:0] r_cin, r_cout;
+    reg [7:0] r_h, r_w, r_p, r_ho, r_wo;
     reg       r_s2, r_relu, r_relu_once;
     always @(posedge clk) if (durum == M_BOS && basla) begin
-        r_cin <= cfg_cin[8*g_li +: 8]; r_cout <= cfg_cout[8*g_li +: 8];
+        r_cin <= cfg_cin[16*g_li +: 16]; r_cout <= cfg_cout[16*g_li +: 16];
         r_h <= g_h; r_w <= g_w; r_p <= g_p; r_s2 <= g_s2; r_ho <= g_ho[7:0]; r_wo <= g_wo[7:0];
         r_relu      <= (cfg_relu[8*g_li +: 8] != 8'd0);
         r_relu_once <= (l >= 4'd2) ? (cfg_relu[8*(l-4'd2) +: 8] != 8'd0) : 1'b0;
@@ -189,15 +192,15 @@ module dizi_motoru #(
         input [11:0] n;
         begin karo_n = (n + 12'd15) >> 4; end
     endfunction
-    wire [7:0]    g_cin  = cfg_cin[8*g_li +: 8], g_cout = cfg_cout[8*g_li +: 8];
-    wire [AW-1:0] g_bp_ic = ((b * karo_n({4'd0, g_cin}) + k0) * karo_n({4'd0, g_h}) + (g_s2 ? 2*z : z)) * g_w;
+    wire [15:0]   g_cin  = cfg_cin[16*g_li +: 16], g_cout = cfg_cout[16*g_li +: 16];
+    wire [AW-1:0] g_bp_ic = ((b * karo_n(g_cin[11:0]) + k0) * karo_n({4'd0, g_h}) + (g_s2 ? 2*z : z)) * g_w;
     reg  [AW-1:0] g_yaz_bas;
     always @* begin
         case (faz)
             2'd0:    g_yaz_bas = taban_akt[AW*l +: AW]
-                               + ((b * karo_n({4'd0, g_cout}) + k0) * karo_n(g_ho) + z) * g_wo[7:0];
+                               + ((b * karo_n(g_cout[11:0]) + k0) * karo_n(g_ho) + z) * g_wo[7:0];
             2'd1:    g_yaz_bas = taban_hata[AW*g_li +: AW] + g_bp_ic;
-            default: g_yaz_bas = taban_grad[AW*l +: AW] + (k1 * karo_n({4'd0, g_cin}) + k0) * 4'd9;
+            default: g_yaz_bas = taban_grad[AW*l +: AW] + (k1 * karo_n(g_cin[11:0]) + k0) * 4'd9;
         endcase
     end
     reg [AW-1:0] r_yaz_bas, r_mask_bas;

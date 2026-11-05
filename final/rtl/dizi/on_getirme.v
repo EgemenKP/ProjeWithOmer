@@ -18,7 +18,8 @@
 //            Akışın t. çevriminde golden'ın t. çevrim girişi (D66). Etkin olmayan satır/sütun 0.
 //  Golden: dizi_sistem_golden.py (onget_izi.txt). Sınır: W <= WMAX = 32 (D97; önceden H, W <= 16, D84/D90).
 //
-//  Yapılandırma (katman li = l − 1, [8*li +: 8]): cfg_cin, cfg_cout, cfg_h, cfg_w, cfg_s, cfg_p.
+//  Yapılandırma (katman li = l − 1): cfg_cin, cfg_cout [16*li +: 16] (D103: 512 kanal), cfg_h, cfg_w, cfg_s,
+//  cfg_p [8*li +: 8]. Komutun k1'i (FP/BP: kanal, WG: o-karo) 16 bit (D103), b, k0, z 8 bit.
 //  Bölge tabanları ve G'ler (indis l = 0..LMAX): taban_akt/taban_hata/taban_agr [AW*l +: AW],
 //  G_akt/G_hata [6*l +: 6]. Adres (D81): taban + ((b·n_karo + karo)·⌈H/16⌉ + satır/16)·W + x.
 //  Yazan: Claude, 04.11.2026 (final/, Adım 5b-3b)
@@ -27,8 +28,8 @@
 
 module on_getirme #(
     parameter NB   = 16,
-    parameter AW   = 9,
-    parameter LMAX = 4,
+    parameter AW   = 13,           // D103 (önceden 9)
+    parameter LMAX = 15,           // D103 (önceden 4)
     parameter HMAX = 32,           // D97: yalnızca belge (pencere H'den bağımsız)
     parameter WMAX = 32            // D97 (önceden 16)
 ) (
@@ -38,9 +39,11 @@ module on_getirme #(
     input  wire                     basla,
     input  wire [1:0]               faz,          // 0 FP, 1 BP, 2 WG
     input  wire [3:0]               l,
-    input  wire [7:0]               b, k0, k1, z,
+    input  wire [7:0]               b, k0, z,
+    input  wire [15:0]              k1,
     // yapılandırma
-    input  wire [LMAX*8-1:0]        cfg_cin, cfg_cout, cfg_h, cfg_w, cfg_s, cfg_p,
+    input  wire [LMAX*16-1:0]       cfg_cin, cfg_cout,
+    input  wire [LMAX*8-1:0]        cfg_h, cfg_w, cfg_s, cfg_p,
     input  wire [(LMAX+1)*AW-1:0]   taban_akt, taban_hata, taban_agr,
     input  wire [(LMAX+1)*6-1:0]    G_akt, G_hata,
     // tamponlar (eşzamanlı okuma: veri bir sonraki kenarda)
@@ -76,10 +79,11 @@ module on_getirme #(
     // 32 bit değişkene bölme). Değerler öncekiyle aynı (geçerli komutlar için).
     reg [1:0]  fz;
     reg [3:0]  ll;
-    reg [7:0]  bb, kk0, kk1, zz;
+    reg [7:0]  bb, kk0, zz;
+    reg [15:0] kk1;
     wire [3:0]  g_li   = l - 4'd1;
-    wire [7:0]  g_cin  = cfg_cin [8*g_li +: 8];
-    wire [7:0]  g_cout = cfg_cout[8*g_li +: 8];
+    wire [15:0] g_cin  = cfg_cin [16*g_li +: 16];
+    wire [15:0] g_cout = cfg_cout[16*g_li +: 16];
     wire [7:0]  g_h    = cfg_h   [8*g_li +: 8];
     wire [7:0]  g_w    = cfg_w   [8*g_li +: 8];
     wire        g_s2   = (cfg_s  [8*g_li +: 8] == 8'd2);
@@ -99,7 +103,8 @@ module on_getirme #(
             default: begin g_nr = g_cin - {k0, 4'd0};                g_nc = g_cout - {k1, 4'd0}; g_T = g_Tfw; end
         endcase
     end
-    reg [7:0] r_cin, r_cout, r_h, r_w, r_p, r_ho, r_wo, r_T;
+    reg [15:0] r_cin, r_cout;
+    reg [7:0] r_h, r_w, r_p, r_ho, r_wo, r_T;
     reg       r_s2;
     reg [4:0] r_nr, r_nc;
     always @(posedge clk) if (durum == D_BOS && basla) begin
@@ -149,9 +154,9 @@ module on_getirme #(
     wire [AW-1:0] g_karo_akt  = (faz == 2'd2) ? k0 : (k1 >> 4);
     wire [AW-1:0] g_karo_hata = (faz == 2'd2) ? k1 : (k1 >> 4);
     wire [AW-1:0] g_bas_akt   = taban_akt[AW*g_li +: AW]
-                              + ((b * karo_n({4'd0, g_cin}) + g_karo_akt) * karo_n({4'd0, g_h})) * g_w;
+                              + ((b * karo_n(g_cin[11:0]) + g_karo_akt) * karo_n({4'd0, g_h})) * g_w;
     wire [AW-1:0] g_bas_hata  = taban_hata[AW*l +: AW]
-                              + ((b * karo_n({4'd0, g_cout}) + g_karo_hata) * karo_n(g_ho)) * g_wo[7:0];
+                              + ((b * karo_n(g_cout[11:0]) + g_karo_hata) * karo_n(g_ho)) * g_wo[7:0];
     wire [AW-1:0] g_agr_fp    = taban_agr[AW*l +: AW] + k0 * g_cin + k1;
     wire [AW-1:0] g_agr_bp    = taban_agr[AW*l +: AW] + (k1 >> 4) * g_cin + {k0, 4'd0};
     reg  [AW-1:0] r_bas_akt, r_bas_hata, r_agr, r_h_pay, o_say;

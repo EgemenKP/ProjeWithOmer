@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D103**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D104**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -1178,6 +1178,27 @@ LUT hücreleri sinyal adına göre sayıldı: ~1.024.000 hücre `v_yaz_veri` (ta
   hiçbir zaman bir okuma ile verisinin arasında değişmiyor (ön-getirmenin son verisi D_BEKLE'de, motorun son maske
   verisi M_SON'da, sonraki okuma ancak yeni komutla), iki yazım eşdeğer; register'lı hâl her akış için doğru
   olduğundan o tutuldu.
+- **Durum:** Claude, 05.11.
+
+### D103 — VGG ölçeği parametreler: kanal ve batch alanları 16 bit, LMAX 15, AW 13 (Faz 2)
+- **Ne:** VGG16-like'ın (D101: 14 katman, 512 kanal, batch 256) donanımın yapılandırma alanlarına sığması için:
+  - `cfg_cin`, `cfg_cout` katman başına 8 → 16 bit; `cfg_batch` 8 → 16 bit; komutun k1'i (FP/BP kanal, WG o-karo,
+    WU kanal) 8 → 16 bit. `cfg_h/w/s/p/relu/sw`, b, k0, z 8 bitte kaldı (VGG16-like'ta en çok 32, 255, 32, 1).
+  - FSM sayaçları (CW) 8 → 16 bit. **Hata düzeltmesi:** `karo()` 8 bitte n + 15 hesaplıyordu, n ≥ 241'de taşıyordu
+    (karo(255) = 0); artık 17 bit.
+  - LMAX 4 (FSM'de 8) → 15 (4 bitlik katman alanının sınırı), BMAX 8 → 256, AW 9 → 13 (tampon bank başına 8192
+    kelime; tahmin ≈ 832 RAMB36, Shao Table I 896 — Shao tampon boyutu vermiyor, kıyaslanabilir boyut `[Çıkarım]`).
+  - Sentez ve 4 testbench artık aynı parametrelerle (önceden sentez LMAX 4, testbench'ler 8).
+  - Testbench'lerdeki komut dizileri 1024 → 32768, katman başına G dizileri 9 → 16; aşılırsa `$fatal` (önceden
+    sessizce taşardı).
+- **Sınırlama (değişmedi):** batch 256'lık VGG16-like'ın çalışma kümesi tampona sığmaz (ağırlıkları bile ≈ 151 Mbit,
+  VC709'un BRAM'i ≈ 53 Mbit); harici bellek (DDR) yok, Shao da anlatmıyor.
+- **Kanıt:** `[Ölçüldü]` XSIM CLI, ag1–ag5: `tb_fsm_dizi` 10230/10230, `tb_on_getirme` 1595333/1595333,
+  `tb_dizi_motoru` 10001/10001, `tb_sistem_dizi` 10961/10961 (34584 çevrim, aynı). Yeni AG6 (golden'da;
+  3 → 40 → 33 → 48 → 36 → 20 → 17 → 16 → 10 kanal, 32×32 → 1×1, batch 4, 8 katman, D101'in 2×2 → 1×1 s2 sonu; 7060 komut,
+  bank başına 3307 adres) dahil ag1–ag6: `tb_fsm_dizi` 80832/80832 (8082 komut), `tb_on_getirme` 25054785/25054785,
+  `tb_dizi_motoru` 57957/57957, `tb_sistem_dizi` 65142/65142 (411757 çevrim). İlk kez denenen birleşimler: 3 kanal
+  karosu × iki satır karosu, batch 4, 8 katman, 1×1 çıkışlı s2 son katman.
 - **Durum:** Claude, 05.11.
 
 ---

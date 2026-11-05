@@ -21,15 +21,17 @@ endmodule
 
 module tb_sistem_dizi_govde;
 
-    localparam NB = 16, AW = 9, LMAX = 8, BMAX = 8;
+    localparam NB = 16, AW = 13, LMAX = 15, BMAX = 256;   // D103: sentezle aynı
 
     reg clk = 1'b0;
     always #5 clk = ~clk;
 
     reg                    rst = 1'b1, basla = 1'b0;
     reg  [3:0]             cfg_L = 0, cfg_m_u = 0;
-    reg  [7:0]             cfg_batch = 0, cfg_s_a0 = 0;
-    reg  [LMAX*8-1:0]      cfg_cin = 0, cfg_cout = 0, cfg_h = 0, cfg_w = 0, cfg_s = 0, cfg_p = 0, cfg_relu = 0, cfg_sw = 0;
+    reg  [15:0]            cfg_batch = 0;
+    reg  [7:0]             cfg_s_a0 = 0;
+    reg  [LMAX*16-1:0]     cfg_cin = 0, cfg_cout = 0;
+    reg  [LMAX*8-1:0]      cfg_h = 0, cfg_w = 0, cfg_s = 0, cfg_p = 0, cfg_relu = 0, cfg_sw = 0;
     reg  [(LMAX+1)*AW-1:0] taban_akt = 0, taban_hata = 0, taban_grad = 0, taban_agr = 0;
     reg  [BMAX*4-1:0]      cfg_etiket = 0;
     wire [(LMAX+1)*6-1:0]  G_akt, G_hata, G_grad;
@@ -55,7 +57,7 @@ module tb_sistem_dizi_govde;
 
     integer kontrol = 0, hata = 0, n_ag = 0, n_kelime = 0, cevrim_top = 0;
     integer fd, n, i, q, x, v, tmp, bank, adr, ll, bekle, a, b_, c_, d_, e_, f_, g_, h_;
-    integer G_bek_akt [0:8], G_bek_hata [0:8], G_bek_grad [0:8];
+    integer G_bek_akt [0:15], G_bek_hata [0:15], G_bek_grad [0:15];   // D103: LMAX 15
     reg [8*16-1:0] ad;
     string dizin, yol;
     reg [133:0] kel;
@@ -81,7 +83,7 @@ module tb_sistem_dizi_govde;
         cfg_cin = 0; cfg_cout = 0; cfg_h = 0; cfg_w = 0; cfg_s = 0; cfg_p = 0; cfg_relu = 0; cfg_sw = 0;
         for (ll = 0; ll < a; ll = ll + 1) begin
             void'($fscanf(fd, "%d %d %d %d %d %d %d %d", b_, c_, d_, e_, f_, g_, h_, v));
-            cfg_cin[8*ll +: 8] = b_; cfg_cout[8*ll +: 8] = c_; cfg_h[8*ll +: 8] = d_; cfg_w[8*ll +: 8] = e_;
+            cfg_cin[16*ll +: 16] = b_; cfg_cout[16*ll +: 16] = c_; cfg_h[8*ll +: 8] = d_; cfg_w[8*ll +: 8] = e_;
             cfg_s[8*ll +: 8] = f_; cfg_p[8*ll +: 8] = g_; cfg_relu[8*ll +: 8] = h_; cfg_sw[8*ll +: 8] = v;
         end
         $fclose(fd);
@@ -192,6 +194,7 @@ module tb_sistem_dizi_govde;
         ag_kos("ag3/");
         ag_kos("ag4/");
         ag_kos("ag5/");
+        ag_kos("ag6/");
         if (hata == 0) $display("SONUC tb_sistem_dizi: PASS %0d/%0d (%0d ag, %0d kelime, %0d cevrim)", kontrol, kontrol, n_ag, n_kelime, cevrim_top);
         else           $display("SONUC tb_sistem_dizi: FAIL %0d hata / %0d", hata, kontrol);
         sfd = $fopen({dizin, "sonuc_tb_sistem_dizi.txt"}, "w");

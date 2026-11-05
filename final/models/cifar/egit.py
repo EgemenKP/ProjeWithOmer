@@ -179,8 +179,12 @@ def main():
     ap.add_argument("--olcum", type=int, default=0, help=">0: yalnızca bu kadar adımın süresini ölç")
     ap.add_argument("--devam", action="store_true", help="çıktı klasöründeki durum.pt'den sürdür")
     ap.add_argument("--mu", type=int, default=5, help="m_u takviminin başlangıcı (NITI 5; D102: VGG16(-like) için 3)")
+    ap.add_argument("--log", default="", help="çıktıyı bu dosyaya yaz (konsolsuz pythonw koşusu için)")
     ap.add_argument("--isci", type=int, default=2, help="veri yükleyici işçi sayısı (her biri ~0,76 GB RAM, 05.11)")
     a = ap.parse_args()
+    if a.log:     # konsolsuz (pythonw) koşu için: çıktı ve hatalar dosyaya
+        import sys
+        sys.stdout = sys.stderr = open(a.log, "a", buffering=1, encoding="utf-8")
     H.GRUP, H.DOYMA, H.YUVARLAMA_AE = a.grup, a.doyma, a.ae
     torch.backends.cudnn.allow_tf32 = False
     torch.backends.cuda.matmul.allow_tf32 = False

@@ -572,12 +572,27 @@ AG5 = dict(ad="ag5", batch=1, tohum=55, katmanlar=[
 ])
 
 
+# AG6 (Faz 2, D103; AW = 13, LMAX = 15): bugüne kadar denenmeyen birleşimler — 33-48 kanal (3 karo) x 32x32 harita
+# (karo + iki satır karosu birlikte), batch 4, 8 katman, ve D101'in sonu (2x2 -> 1x1, 3x3 s2 p1, ReLU yok).
+AG6 = dict(ad="ag6", batch=4, tohum=66, katmanlar=[
+    dict(cin=3,  cout=40, h=32, w=32, s=1, p=1, relu=1, sw=-8),
+    dict(cin=40, cout=33, h=32, w=32, s=2, p=1, relu=1, sw=-9),
+    dict(cin=33, cout=48, h=16, w=16, s=1, p=1, relu=1, sw=-9),
+    dict(cin=48, cout=36, h=16, w=16, s=2, p=1, relu=1, sw=-9),
+    dict(cin=36, cout=20, h=8,  w=8,  s=1, p=0, relu=1, sw=-9),
+    dict(cin=20, cout=17, h=6,  w=6,  s=2, p=1, relu=1, sw=-9),
+    dict(cin=17, cout=16, h=3,  w=3,  s=2, p=1, relu=1, sw=-8),
+    dict(cin=16, cout=10, h=2,  w=2,  s=2, p=1, relu=0, sw=-9),
+])
+
+
 def main(klasor="adim5_vektorleri"):
     calistir(S.AG1, klasor)
     calistir(S.AG2, os.path.join(klasor, "ag2"))
     calistir(AG3, os.path.join(klasor, "ag3"))
     calistir(AG4, os.path.join(klasor, "ag4"))
     calistir(AG5, os.path.join(klasor, "ag5"))
+    calistir(AG6, os.path.join(klasor, "ag6"))
     S.ag_kur(S.AG1)
 
 

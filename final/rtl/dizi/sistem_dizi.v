@@ -24,9 +24,10 @@
 
 module sistem_dizi #(
     parameter NB   = 16,
-    parameter AW   = 9,
-    parameter LMAX = 4,
-    parameter BMAX = 8
+    // D103: VGG16-like ölçeği (14 katman, 512 kanal, batch 256); AW 13: tampon bank başına 8192 kelime
+    parameter AW   = 13,
+    parameter LMAX = 15,
+    parameter BMAX = 256
 ) (
     input  wire                     clk,
     input  wire                     rst,
@@ -35,10 +36,11 @@ module sistem_dizi #(
     output wire                     mesgul,
     // yapılandırma
     input  wire [3:0]               cfg_L,
-    input  wire [7:0]               cfg_batch,
+    input  wire [15:0]              cfg_batch,                 // D103: 16 bit
     input  wire [3:0]               cfg_m_u,
     input  wire [7:0]               cfg_s_a0,
-    input  wire [LMAX*8-1:0]        cfg_cin, cfg_cout, cfg_h, cfg_w, cfg_s, cfg_p, cfg_relu, cfg_sw,
+    input  wire [LMAX*16-1:0]       cfg_cin, cfg_cout,         // D103: katman başına 16 bit
+    input  wire [LMAX*8-1:0]        cfg_h, cfg_w, cfg_s, cfg_p, cfg_relu, cfg_sw,
     input  wire [(LMAX+1)*AW-1:0]   taban_akt, taban_hata, taban_grad, taban_agr,
     input  wire [BMAX*4-1:0]        cfg_etiket,
     // bölge G'leri (izleme)
@@ -64,7 +66,7 @@ module sistem_dizi #(
     wire [10*KAW-1:0] kom;
     reg               kom_bitti;
     wire [5:0]        G_motor;
-    master_controller_dizi #(.AW(KAW), .LMAX(LMAX)) u_fsm (
+    master_controller_dizi #(.AW(KAW), .LMAX(LMAX), .CW(16)) u_fsm (
         .clk(clk), .rst(rst), .basla(basla), .cfg_L(cfg_L), .cfg_batch(cfg_batch), .cfg_m_u(cfg_m_u),
         .cfg_s_a0(cfg_s_a0), .cfg_cin(cfg_cin), .cfg_cout(cfg_cout), .cfg_h(cfg_h), .cfg_w(cfg_w), .cfg_s(cfg_s),
         .cfg_p(cfg_p), .cfg_relu(cfg_relu), .cfg_sw(cfg_sw), .maks_G(G_motor), .kom_bitti(kom_bitti),
@@ -75,7 +77,7 @@ module sistem_dizi #(
     wire [3:0] k_l   = kom[KAW*2 +: 4];
     wire [7:0] k_b   = kom[KAW*3 +: 8];
     wire [7:0] k_x   = kom[KAW*4 +: 8];
-    wire [7:0] k_y   = kom[KAW*5 +: 8];
+    wire [15:0] k_y  = kom[KAW*5 +: 16];               // D103: kanal (≤ 511)
     wire [7:0] k_z   = kom[KAW*6 +: 8];
     wire       k_a1  = kom[KAW*7];
     wire       k_a2  = kom[KAW*8];
@@ -158,8 +160,8 @@ module sistem_dizi #(
     // ---- katman boyutları (yürütücü) ----
     integer cin, cout, L, no;
     always @* begin
-        cin  = cfg_cin [8*(k_l-1) +: 8];
-        cout = cfg_cout[8*(k_l-1) +: 8];
+        cin  = cfg_cin [16*(k_l-1) +: 16];
+        cout = cfg_cout[16*(k_l-1) +: 16];
         L    = cfg_L;
         no   = cout - 16*k_x;
         if (no > 16) no = 16;
@@ -168,11 +170,11 @@ module sistem_dizi #(
     // D96 (Adım 5c-b): adresler (D81, AW bitte sarar). CLU: AKT[L] / HATA[L] (1×1 harita, tek karo) -> taban + b.
     // WU: ağırlık taban + o-karo·cin + c; GRAD[l] taban + (o-karo·⌈cin/16⌉ + c/16)·9 + q. Komut boyunca sabit
     // (kom register'ı), tek çarpım kopyası.
-    wire [7:0]    cin8      = cfg_cin[8*(k_l-1) +: 8];
+    wire [15:0]   cin8      = cfg_cin[16*(k_l-1) +: 16];      // (ad tarihsel; D103'ten beri 16 bit)
     wire [AW-1:0] clu_a_adr = taban_akt [AW*cfg_L +: AW] + k_b;
     wire [AW-1:0] clu_e_adr = taban_hata[AW*cfg_L +: AW] + k_b;
     wire [AW-1:0] wu_a_adr  = taban_agr[AW*k_l +: AW] + k_x * cin8 + k_y;
-    wire [AW-1:0] wu_g_bas  = taban_grad[AW*k_l +: AW] + (k_x * (({4'd0, cin8} + 12'd15) >> 4) + (k_y >> 4)) * 4'd9;
+    wire [AW-1:0] wu_g_bas  = taban_grad[AW*k_l +: AW] + (k_x * ((cin8 + 16'd15) >> 4) + (k_y >> 4)) * 4'd9;
 
     // ---- yürütücü ----
     localparam Y_BOS = 4'd0, Y_DIZI = 4'd1, Y_CLU_OKU = 4'd2, Y_CLU_AL = 4'd3, Y_CLU_BEKLE = 4'd4,
