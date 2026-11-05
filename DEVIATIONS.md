@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D101**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D103**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -1218,6 +1218,38 @@ eğitimin FPGA'da mı yazılım modelinde mi yapıldığı metinde yazmıyor. NI
 - **Bilinen sınır:** WG birikimi int32'de; 32×32 haritada batch 256 en kötü durumda taşabilir (D21: batch ≤ 130).
   Donanım da int32 biriktirdiği için taşma aynı şekilde sarar; NITI de int32 biriktiriyor.
 - **Süre:** RTX 3060 Laptop'ta VGG16 benzeri, int: 1,65 s/adım (200 epoch ≈ 18 saat); float: 0,16 s/adım.
+
+### D101 — VGG16-like tamamen konvolüsyonel: son max-pool + FC yerine tek s2 conv (D87'nin sonunun yerine)
+- **Ne:** D87'deki "maxpool (2×2 → 1×1), FC 512 → 10" çifti, Shao'nun kuralı aynen uygulanarak tek bir 3×3, s2, p1
+  conv 512 → 10 (2×2 → 1×1, ReLU yok) olur. Ağ: 13 conv (D87'deki gibi) + bu son conv = 14 katman, hepsi 3×3 conv,
+  s ∈ {1, 2}: her katman RTL'in modlarında, 4 bitlik katman alanına sığar. Eski hâli `egit.py --ag vgg16like_d87`.
+  Fig. 9'un "VGG16" referans eğrisi (`vgg16`, max-pool'lu) değişmedi.
+- **Neden:** Ego 05.11 (karar 2a): RTL'e max-pool / FC eklenmiyor (1a); D87'nin sonu yalnızca yazılımda kalırdı.
+  Shao'nun kuralı "max-pool + ardından gelen katman → s2 conv"; son max-pool'un ardından gelen katman FC.
+- **Kanıt:** `[PDF tam]` Shao IV: "replace the max-pooling layer and its subsequent convolutional layer (stride=1)
+  with a convolutional layer (stride=2)". `[Çıkarım]` Kuralın FC'yi izleyen son max-pool'a da uygulanması (Shao son
+  katmanları tarif etmiyor). `[Ölçüldü]` `kontrol_hizli.py`: bu sonla biten 4 katmanlı ağ (`d101_son`: 8 → 4 → 2 → 1,
+  33 kanal) golden'la (II') bit bit aynı (6/6 PASS). `kontrol_maxpool_fc.py`: hizli_model'in max-pool ve FC yolları
+  (yalnızca VGG16 referans eğrisi kullanıyor) döngülü bağımsız referansa karşı PASS (FC'de int32 taşması denenmedi;
+  VGG16'nın FC'sinde K = 512, taşma olamaz).
+- **Durum:** Claude, 05.11.
+
+### D102 — m_u takvimi 14 katmanlı ağlar için 3 → 2 → 1 (D88'deki NITI 5 → 4 → 3 yerine)
+- **Ne:** `egit.py --mu 3`: güncelleme bit genişliği m_u ilk yarıda 3, 100. epoch'ta 2, 150. epoch'ta 1 (NITI'nin takvim
+  biçimi aynı, başlangıç 2 bit aşağıda). VGG16-like ve Fig. 9'un VGG16 referansı için. vggsmall7 için 5 kalır.
+- **Neden:** İlk 2 epoch'luk deneme (m_u 5) öğrenmedi (test %11,2 / %9,8, rastgele %10). Kök neden araştırması
+  (sabit 64'lük batch'i 40–60 adımda ezberleme testi, `[Ölçüldü]`):
+  - NITI'nin 6 katmanlı vggsmall7'si bizim int8 aritmetiğimizle m_u 5'te 40 adımda %92 → aritmetik, CLU, WU doğru.
+  - 14 katmanlı vgg16like, eski sonlu vgg16like_d87 ve max-pool'lu vgg16: m_u 5'te öğrenmiyor (%12–20), son katman
+    çıkışı 0'a çöküyor, ReLU'lar ölüyor, her adımda ağırlıkların %5–90'ı değişiyor → D101 neden değil, derinlik.
+  - Grup ölçeklemesi neden değil: `--grup 0` (NITI'nin tensör başına ölçeği) ile de öğrenmiyor.
+  - vgg16like, yalnızca m_u değişerek: 5 → %14, **3 → %69**, **2 → %66**, 1 → %28 (60 adım).
+  - Aynı ağın float hâli (xavier, SGD lr 0,01 momentum 0,9) de 80 adımda kaybı 2,302'den indiremedi: BN'siz derin
+    düz VGG bu başlatmayla zor; sorun int aritmetiğine özgü değil.
+- **Kanıt:** `[PDF tam]` NITI §3.3: "values of mu in the range of 1 to 5 bits performed well in general" (m_u ayarlanan
+  bir hiperparametre). `[NITI GitHub]` 5 → 4 → 3 takvimi `ti_vgg.py`'de VGG-small için. Shao m_u'yu vermiyor.
+  `[Ölçüldü]` yukarıdaki tablo; gerçek veriyle 2 epoch sonucu aşağıda.
+- **Durum:** Claude, 05.11.
 
 ---
 

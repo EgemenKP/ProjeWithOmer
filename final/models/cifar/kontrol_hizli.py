@@ -70,8 +70,17 @@ def rastgele_ag(tohum):
     return dict(ad=f"rastgele{tohum}", batch=r.choice([2, 3]), tohum=tohum, katmanlar=katmanlar)
 
 
+# D101: VGG16-like'ın sonu gibi biten ağ (s2 conv'larla 8 -> 4 -> 2 -> 1, son katman 3x3 s2 p1 2x2 -> 1x1, ReLU yok,
+# 33 kanal = 3 karo)
+D101_SON = dict(ad="d101_son", batch=2, tohum=101, katmanlar=[
+    dict(cin=3, cout=17, h=8, w=8, s=1, p=1, relu=1, sw=-8),
+    dict(cin=17, cout=20, h=8, w=8, s=2, p=1, relu=1, sw=-8),
+    dict(cin=20, cout=33, h=4, w=4, s=2, p=1, relu=1, sw=-8),
+    dict(cin=33, cout=10, h=2, w=2, s=2, p=1, relu=0, sw=-9)])
+
+
 def main():
-    aglar = [S.AG1, S.AG2]
+    aglar = [S.AG1, S.AG2, D101_SON]
     tohum = 1
     while len(aglar) < 6:
         a = rastgele_ag(tohum)
