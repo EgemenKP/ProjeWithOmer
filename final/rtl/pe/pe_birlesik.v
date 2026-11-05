@@ -6,7 +6,7 @@
 //  (rtl/sistem/pe_sarmalayici.v) Egemen'in beş ayrı devresini (45 MAC) seçiyordu; bu modül
 //  aynı altı deseni AYNI 9 MAC'le, Fig. 2'deki port etiketleriyle yapar (D69).
 //
-//  Her MAC (mac.v, değişmedi) Fig. 2'deki gibi:
+//  Her MAC Fig. 2'deki gibi (D105'ten beri mac_dsp.v: seçici DSP48E1'in Z mux'unda, port 4 DSP zinciriyle):
 //    port 1  (weight)           : Weights/Errors   — FP/BP'de w[r][c], WG'de e (c çevrim gecikmeli)
 //    port 2  (activation)       : Activations/Errors — FP/BP s1, BP s2, WG s1'de akis1[r];
 //                                 FP s2 / WG s2'de c=0 çift, c=1 tek, c=2 gecikmeli çift ("mavi D")
@@ -15,7 +15,7 @@
 //    port 4  (passed_value / 0) : soldaki MAC'in sonucu ya da 0 (satır 1-2'nin başı, BP s2'nin
 //                                 satır 2 başları)
 //    port 5  (accumulated_value): kendi sonucu (WG, çıktı-durağan)
-//  sel kodlaması mac.v'deki gibi (D13): 00 port 3, 01 port 4, 10 port 5.
+//  sel (D13) -> Z: port 3 = C (011), port 4 = PCIN (001) ya da 0 (000), port 5 = P (010).
 //
 //  Çıkış tarafı Fig. 2'deki iki toplayıcı + mux ile:
 //    FP / BP s1 : psum_out = (m02 + m12) + m22
@@ -87,37 +87,29 @@ module pe_birlesik (
 
     // ---- 9 MAC ----
     wire signed [31:0] m [0:8];          // m[3r+c]: MAC[r][c]'nin sonucu
+    wire        [47:0] pc [0:8];         // DSP PCOUT zinciri (satır içinde soldan sağa)
 
     genvar r, c;
     generate
         for (r = 0; r < 3; r = r + 1) begin : satir
             for (c = 0; c < 3; c = c + 1) begin : sutun
-                // port 1: ağırlık ya da (WG) c çevrim gecikmeli hata
                 wire signed [7:0] e_c  = (c == 0) ? e_akis[8*r +: 8] : (c == 1) ? e_d1[r] : e_d2[r];
                 wire signed [7:0] p1   = s_wsabit ? w_flat[8*(3*r+c) +: 8] :
                                          s_wg     ? e_c : 8'sd0;
-                // port 2: aktivasyon / hata
                 wire signed [7:0] ct   = (c == 0) ? akis1[8*r +: 8] : (c == 1) ? akis2[8*r +: 8] : d_cift[r];
                 wire signed [7:0] p2   = (s_wsabit || s_wg) ? (s_cifttek ? ct : akis1[8*r +: 8]) : 8'sd0;
-                // port 3: Psum FIFO'dan kısmi toplam (yalnızca zincir başlarında kullanılır)
                 wire signed [31:0] p3  = (r == 0 && c == 0) ? ps_flat[0  +: 32] :
                                          (r == 0 && c == 2) ? ps_flat[32 +: 32] :
                                          (r == 1 && c == 0) ? ps_flat[64 +: 32] :
                                          (r == 1 && c == 2) ? ps_flat[96 +: 32] : 32'sd0;
-                // port 4: soldaki MAC'in sonucu ya da 0. BP s2'de c=2 ayrı (B) zincir: 0
-                wire signed [31:0] p4  = (c == 0) ? 32'sd0 :
-                                         (c == 1) ? m[3*r] :
-                                         (s_bp2 ? 32'sd0 : m[3*r+1]);
-                // sel: 00 port 3, 01 port 4, 10 port 5
                 wire ps_basi = s_zincir ? (r == 0 && c == 0) :
                                s_bp2    ? (r < 2 && c != 1) : 1'b0;
-                wire [1:0] sel = (s_zincir || s_bp2) ? (ps_basi ? 2'b00 : 2'b01) : 2'b10;
-
-                mac u_mac (
-                    .clk(clk), .rst(rst & s_wg),
-                    .weight(p1), .activation(p2),
-                    .partial_sum(p3), .passed_value(p4), .accumulated_value(m[3*r+c]),
-                    .sel(sel), .result(m[3*r+c])
+                // Z: port 3 -> C (011); port 4 -> PCIN (001) ya da 0 (000: c = 0 veya BP s2'de c = 2); port 5 -> P (010)
+                wire p4_sifir = (c == 0) || (c == 2 && s_bp2);
+                wire [2:0] zsel = (s_zincir || s_bp2) ? (ps_basi ? 3'b011 : (p4_sifir ? 3'b000 : 3'b001)) : 3'b010;
+                mac_dsp u_mac (
+                    .clk(clk), .rst(rst & s_wg), .weight(p1), .activation(p2), .c_in(p3),
+                    .pcin((c == 0) ? 48'd0 : pc[3*r+c-1]), .zsel(zsel), .result(m[3*r+c]), .pcout(pc[3*r+c])
                 );
             end
         end

@@ -52,7 +52,7 @@ proc log_sonucu {tb log} {
 
 foreach {kosu kaynaklar} [list \
         ASIL     [list "$kok/mac.v" "$kok/pe_chain3.v" "$kok/pe_fp_s2.v" "$kok/pe_bp_s2.v" "$kok/pe_wg_s1.v" "$kok/pe_wg_s2.v"] \
-        BIRLESIK [list "$kok/mac.v" "$kok/pe_birlesik.v" "$kok/pe_birlesik_kabuklar.sv"]] {
+        BIRLESIK [list "$kok/mac.v" "$kok/mac_dsp.v" "$kok/pe_birlesik.v" "$kok/pe_birlesik_kabuklar.sv"]] {
     set pdir "$kok/vivado_sim_[string tolower $kosu]"
     set pad  "pe_[string tolower $kosu]"
     if {[file exists $pdir]} { catch {file delete -force $pdir} }
@@ -73,6 +73,8 @@ foreach {kosu kaynaklar} [list \
         file delete -force "$calisma/pe_vectors"
         file copy -force $vek "$calisma/pe_vectors"
         catch {set_property -name {xsim.simulate.runtime} -value {all} -objects [get_filesets $ss]}
+        # D105: mac_dsp'nin davranissal hali (glbl'nin 100 ns GSR'si DSP48E1'in P register'ini ilk hesapta tutar)
+        catch {set_property -name {xsim.compile.xvlog.more_options} -value {-d SIM_DAVRANISSAL} -objects [get_filesets $ss]}
         if {[catch {launch_simulation -simset $ss} hata]} {
             lappend ozet "SONUC $tb: CALISTIRILAMADI ([string range $hata 0 160])"
             catch {close_sim -force}

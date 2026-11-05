@@ -53,7 +53,7 @@ proc raporla {cikti ad} {
 
 if {$asama eq "dizi"} {
     create_project -in_memory -part $parca
-    read_verilog [list "$kok/pe_dizi.v" "$repo/rtl/pe/mac.v" "$repo/rtl/pe/pe_birlesik.v" "$repo/rtl/sistem/psum_fifo.v"]
+    read_verilog [list "$kok/pe_dizi.v" "$repo/rtl/pe/mac_dsp.v" "$repo/rtl/pe/pe_birlesik.v" "$repo/rtl/sistem/psum_fifo.v"]
     saat_xdc $cikti
     synth_design -top pe_dizi -part $parca -mode out_of_context -flatten_hierarchy $duzlestir {*}$sentez_ek
     write_checkpoint -force "$cikti/dizi_sentez.dcp"

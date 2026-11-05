@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D105**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D106**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -1216,6 +1216,27 @@ LUT hücreleri sinyal adına göre sayıldı: ~1.024.000 hücre `v_yaz_veri` (ta
   PE testlerinde 21–32 hata; (2)'de şerit 1 b_gec yerine a_ps → 430043 hata; şerit 0 a_ps yerine b_gec → 1895162 hata.
   Kaynak etkisi Faz 3 ölçüm kapısı A'da (sentez, eğitim koşuları arasında).
 - **Durum:** Claude, 05.11.
+
+### D105 — MAC'in 3'e 1 seçicisi DSP48E1'in Z seçicisinde (Faz 3 adım 3, yazım küçültmesi)
+- **Ne:** Yeni `final/rtl/pe/mac_dsp.v`: P = Z + A·B tek bir DSP48E1'de; Fig. 2'nin port 3'ü (Psum FIFO) → C girişi
+  (Z = 011), port 4 (soldaki MAC'in sonucu) → PCIN, DSP zinciri (Z = 001; c = 0'da ve BP s2'nin c = 2'sinde 0,
+  Z = 000), port 5 (kendi sonucu, WG) → P geri beslemesi (Z = 010). `pe_birlesik.v` artık mac_dsp kullanıyor;
+  Egemen'in `mac.v`'si kendi 5 PE devresi (ASIL testler) için değişmeden duruyor. Çıkış P[31:0]: 48 bitlik toplamın
+  alt 32 biti 32 bitte sarmalı toplamla aynı (+ ve · modüler).
+- **Simülasyon notu:** Xilinx `glbl` modülü simülasyonun ilk 100 ns'inde GSR'yi tutar; DSP'nin P register'ı ilk
+  hesabı kaçırır (yalnızca simülasyonda; donanımda GSR konfigürasyon sırasında biter). Bu yüzden `mac_dsp.v`'de
+  `SIM_DAVRANISSAL` tanımlıyken aynı veri yolunun davranışsal hâli kullanılır; Vivado `run_sim.tcl`'leri bunu tanımlar
+  (`xsim.compile.xvlog.more_options -d SIM_DAVRANISSAL`). Sentez her zaman primitifi kullanır.
+- **Neden:** Tek PE sentezi (`flatten none`): 622 → 273 LUT, DSP 9 (aynı). Shao Table I: LUT 171k, DSP 2324 — DSP'nin
+  iç seçicisinin kullanıldığını düşündürüyor `[Çıkarım]`. Mimari aynı (Fig. 2'nin 3 girişi ve seçim kuralı).
+- **Kanıt:** `[Ölçüldü]` Egemen'in 7 PE testi hem primitifle (XSIM CLI, unisims_ver, ROC_WIDTH = 0'lı glbl) hem
+  davranışsal modelle 38/38, 38/38, 34/34, 24/24, 32/32, 5/5, 5/5 (orijinal glbl ile primitifte her testte tam 1 hata,
+  ilk kontrol — GSR hipotezi ROC_WIDTH = 0 ile doğrulandı). Mutasyon (PE testleri, yakalandı): port 4'te Z = P →
+  166 hata; PCIN yanlış komşudan → 134; BP s2'nin B zincirinde 0 yerine PCIN → 24. Sistem testleri (davranışsal
+  modelle; 2304 primitifle XSIM'de `tb_pe_dizi` tek başına 46 dakikayı geçti, durduruldu): `tb_pe_dizi`
+  2363392/2363392, `tb_dizi_motoru` 57957/57957, `tb_sistem_dizi` 65142/65142 (411757 çevrim, aynı). Primitif ile
+  davranışsal model PE testlerinde aynı; sistem testlerinin sınadığı bağlantılar (zsel, PCIN zinciri) iki modda ortak.
+- **Durum:** Claude, 05.11–06.11.
 
 ---
 

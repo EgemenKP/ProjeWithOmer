@@ -79,7 +79,7 @@ set rtl {}
 foreach ad {pe_dizi grup_kurucu veri_tamponu agirlik_tamponu on_getirme dizi_motoru master_controller_dizi sistem_dizi} {
     lappend rtl "$kok/$ad.v"
 }
-foreach ad {pe/mac pe/pe_birlesik sistem/psum_fifo fe/relu_unit fe/wu_unit fe/fe_top \
+foreach ad {pe/mac pe/mac_dsp pe/pe_birlesik sistem/psum_fifo fe/relu_unit fe/wu_unit fe/fe_top \
             clu/max_tree clu/clu_top clu/epu clu/teu clu/adder_tree clu/div_stage_ip} {
     lappend rtl "$repo/rtl/$ad.v"
 }
@@ -126,6 +126,8 @@ foreach tb $testler {
     file mkdir $calisma
     foreach f [glob -nocomplain "$vek/*"] { file copy -force $f $calisma }
     catch {set_property -name {xsim.simulate.runtime} -value {all} -objects [get_filesets $ss]}
+    # D105: mac_dsp'nin davranissal hali (glbl'nin 100 ns GSR'si DSP48E1'in P register'ini ilk hesapta tutar)
+    catch {set_property -name {xsim.compile.xvlog.more_options} -value {-d SIM_DAVRANISSAL} -objects [get_filesets $ss]}
     catch {set_property -name {xsim.simulate.log_all_signals} -value {false} -objects [get_filesets $ss]}
     if {[catch {launch_simulation -simset $ss} hata]} {
         lappend ozet "SONUC $tb: CALISTIRILAMADI ([string range $hata 0 160])"
