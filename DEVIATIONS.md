@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D106**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D107**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -1237,6 +1237,22 @@ LUT hücreleri sinyal adına göre sayıldı: ~1.024.000 hücre `v_yaz_veri` (ta
   2363392/2363392, `tb_dizi_motoru` 57957/57957, `tb_sistem_dizi` 65142/65142 (411757 çevrim, aynı). Primitif ile
   davranışsal model PE testlerinde aynı; sistem testlerinin sınadığı bağlantılar (zsel, PCIN zinciri) iki modda ortak.
 - **Durum:** Claude, 05.11–06.11.
+
+### D106 — Motorda zamanlama: komut başı sınırlar register'da, LMS önüne P aşaması (Faz 4)
+- **Ne:** `dizi_motoru.v`: (1) Etkin satır/sütun sayıları (nr, nc) ve BP s2'nin satır/sütun sınırları, satır payı eşiği
+  komutun `basla`'sında bir kez register'a (r_nr, r_nc, r_umin = p − 32z, r_umax = h + p − 32z, r_vmax = w + p,
+  r_p16 = p + 16); boşaltmada satır içi u = 2i + ds[1], sütun v = 2q + ds[0] ile küçük karşılaştırmalar (önceden her
+  satırda 32 bit R = 2(16z + i) + ds/2 − p, e = R − 32z). (2) Aşama A'nın çıkışları (grup, geçerli, adres, maske adresi,
+  bank) bir P register'ında; LMS, global G'ye gönderim ve maske okuması P'den, B bir çevrim sonra. Son grup için
+  M_SON'dan önce bir bekleme durumu (M_BEK): DIZI komutu başına +1 çevrim, veri aynı.
+- **Neden:** (c) + (d) sonrası sistem sentezinde en kötü yol r_h → BP s2 sınır kontrolü → A_gec → LMS → global G'nin
+  CE'si, 72 mantık seviyesi, WNS −18,2 ns (200 MHz). Shao 200 MHz'de çalışıyor (IV); boru hattının ayrıntısını vermiyor.
+  `[Çıkarım]`
+- **Kanıt:** `[Ölçüldü]` XSIM CLI, ag1–ag6: (1) sonrası `tb_dizi_motoru` 57957/57957, `tb_sistem_dizi` 65142/65142
+  (411757 çevrim); (2) sonrası `tb_dizi_motoru` 57957/57957, `tb_sistem_dizi` 65142/65142, 419000 çevrim
+  (= 411757 + 7243 DIZI komutu, beklenen +1). Mutasyon (`tb_dizi_motoru`, yakalandı): r_umax bir fazla → 3339 hata;
+  satır payı eşiği p + 15 → 4725; B'nin adresi P yerine A'dan → 51203. Zamanlama etkisi Faz 3/4 sentezinde.
+- **Durum:** Claude, 06.11.
 
 ---
 

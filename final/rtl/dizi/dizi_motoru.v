@@ -71,7 +71,8 @@ module dizi_motoru #(
 
     // M_ONGET: ön-getirmenin yükleme ve akış fazları (akış = og_akis)
     localparam M_BOS = 4'd0, M_WGRST = 4'd1, M_ONGET = 4'd2, M_SON1 = 4'd4,
-               M_BP2 = 4'd5, M_WG = 4'd6, M_SON = 4'd7;
+               M_BP2 = 4'd5, M_WG = 4'd6, M_SON = 4'd7,
+               M_BEK = 4'd8;          // D106: P aşamasındaki son grubun B'ye geçmesi için 1 çevrim
     reg [3:0] durum;
     assign mesgul = (durum != M_BOS);
 
@@ -83,6 +84,7 @@ module dizi_motoru #(
     wire [3:0]  g_li  = l - 4'd1;
     wire [7:0]  g_h   = cfg_h[8*g_li +: 8], g_w = cfg_w[8*g_li +: 8], g_p = cfg_p[8*g_li +: 8];
     wire        g_s2  = (cfg_s[8*g_li +: 8] == 8'd2);
+    wire [15:0] g_cin = cfg_cin[16*g_li +: 16], g_cout = cfg_cout[16*g_li +: 16];
     wire [11:0] g_h2p = {4'd0, g_h} + {3'd0, g_p, 1'b0};
     wire [11:0] g_w2p = {4'd0, g_w} + {3'd0, g_p, 1'b0};
     wire [11:0] g_ho  = g_s2 ? (((g_h2p - 12'd3) >> 1) + 12'd1) : (g_h2p - 12'd2);
@@ -143,16 +145,31 @@ module dizi_motoru #(
         .ps_bas_flat(ps_bas));
 
     // ---- geçiş sayıları ----
-    integer nr, nc, npass, v0, Np, c_say, tt;
+    // D106 (Faz 4): etkin satır/sütun sayıları ve BP s2'nin sınırları komutun basla'sında bir kez (D95 gibi);
+    // önceden her çevrim 32 bit integer aritmetiğiyle (sentezdeki en kötü yolun başı, r_h -> ... -> G).
+    wire [11:0] g_np  = ({4'd0, g_h} + {4'd0, g_p} + 12'd1) >> 1;
+    reg  [15:0] g_nr16, g_nc16;
     always @* begin
-        npass = (h + p + 1) / 2;
-        case (fz)
-            2'd0:    begin nr = ho - 16*zz; nc = cout - 16*kk0; end
-            2'd1:    begin nr = ((s == 1) ? h : npass) - 16*zz; nc = cin - 16*kk0; end
-            default: begin nr = cin - 16*kk0; nc = cout - 16*kk1; end
+        case (faz)
+            2'd0:    begin g_nr16 = {4'd0, g_ho} - {4'd0, z, 4'd0};                    g_nc16 = g_cout - {4'd0, k0, 4'd0}; end
+            2'd1:    begin g_nr16 = (g_s2 ? {4'd0, g_np} : {8'd0, g_h}) - {4'd0, z, 4'd0}; g_nc16 = g_cin - {4'd0, k0, 4'd0}; end
+            default: begin g_nr16 = g_cin - {4'd0, k0, 4'd0};                            g_nc16 = g_cout - {k1[11:0], 4'd0}; end
         endcase
-        if (nr > 16) nr = 16;
-        if (nc > 16) nc = 16;
+    end
+    reg [4:0]         r_nr, r_nc;
+    reg signed [10:0] r_umin, r_umax;           // BP s2: satır içi u = 2i + ds[1] geçerli: r_umin <= u < r_umax
+    reg [8:0]         r_vmax, r_p16;            // sütun v = 2q + ds[0] geçerli: p <= v < w + p; satır payı sınırı p + 16
+    always @(posedge clk) if (durum == M_BOS && basla) begin
+        r_nr   <= (g_nr16 > 16'd16) ? 5'd16 : g_nr16[4:0];
+        r_nc   <= (g_nc16 > 16'd16) ? 5'd16 : g_nc16[4:0];
+        r_umin <= $signed({3'd0, g_p}) - $signed({1'b0, z[4:0], 5'd0});
+        r_umax <= $signed({3'd0, g_h}) + $signed({3'd0, g_p}) - $signed({1'b0, z[4:0], 5'd0});
+        r_vmax <= {1'b0, g_w} + {1'b0, g_p};
+        r_p16  <= {1'b0, g_p} + 9'd16;
+    end
+    integer nr, nc, v0, Np, c_say, tt;
+    always @* begin
+        nr = r_nr; nc = r_nc;
         v0 = (mod_k == 3'd3) ? 1 : 2;
         Np = (mod_k == 3'd3) ? (og_T - 1) : (og_T - 2);
     end
@@ -192,7 +209,6 @@ module dizi_motoru #(
         input [11:0] n;
         begin karo_n = (n + 12'd15) >> 4; end
     endfunction
-    wire [15:0]   g_cin  = cfg_cin[16*g_li +: 16], g_cout = cfg_cout[16*g_li +: 16];
     wire [AW-1:0] g_bp_ic = ((b * karo_n(g_cin[11:0]) + k0) * karo_n({4'd0, g_h}) + (g_s2 ? 2*z : z)) * g_w;
     reg  [AW-1:0] g_yaz_bas;
     always @* begin
@@ -224,23 +240,29 @@ module dizi_motoru #(
         end
     endfunction
 
-    integer i, j, R, C, sr, xr, kanal_sec, e;
-    reg [AW-1:0] satir_pay;
+    // D106 (Faz 4): BP s2'de satır R = 32z + u − p (u = 2i + ds[1]), sütun C = v − p (v = 2q + ds[0]); sınırlar ve
+    // satır payı komut başındaki register'larla küçük karşılaştırmalar (önceden her satırda 32 bit R, e hesabı).
+    // Bank = R[3:0]: FP / BP s1'de i, BP s2'de (u − p)[3:0] (32z 16'nın katı).
+    integer i, j;
+    reg [AW-1:0] satir_pay, Cs;
+    reg [5:0]    bu;                             // u = 2i + ds[1]
+    reg [8:0]    bv;                             // v = 2q + ds[0]
+    reg [3:0]    bk;
     always @* begin
         A_grup = {NB*512{1'b0}}; A_gec = {NB{1'b0}}; A_adr = {NB*AW{1'b0}}; A_madr = {NB*AW{1'b0}};
         A_bank = {NB*4{1'b0}};
         for (i = 0; i < NB; i = i + 1) begin
-            R = 0; C = 0; sr = 0;
+            Cs = tt - v0; bk = i[3:0]; satir_pay = {AW{1'b0}};
+            bu = 2*i + ds[1]; bv = {dq, 1'b0} + ds[0];
             if (fz == 2'd0 && son_k && cikis_gecerli && i < nr) begin                    // FP
-                A_gec[i] = 1'b1; R = 16*zz + i; C = tt - v0;
+                A_gec[i] = 1'b1;
                 for (j = 0; j < NB; j = j + 1) if (j < nc) A_grup[512*i + 32*j +: 32] = cikis[128*(i*NB + j) +: 32];
-                A_adr[AW*i +: AW] = r_yaz_bas + C;
+                A_adr[AW*i +: AW] = r_yaz_bas + Cs;
             end else if (fz == 2'd1 && s == 1 && son_k && cikis_gecerli && i < nr) begin  // BP s1
-                A_gec[i] = 1'b1; R = 16*zz + i; C = tt - v0;
+                A_gec[i] = 1'b1;
                 for (j = 0; j < NB; j = j + 1) if (j < nc) A_grup[512*i + 32*j +: 32] = cikis[128*(i*NB + j) +: 32];
             end else if (durum == M_BP2 && i < nr && ((i < 8) != dh)) begin             // BP s2 boşaltma
-                R = 2*(16*zz + i) + ds / 2 - p; C = 2*dq + ds % 2 - p;
-                if (R >= 0 && R < h && C >= 0 && C < w) begin
+                if ($signed({5'd0, bu}) >= r_umin && $signed({5'd0, bu}) < r_umax && bv >= {1'b0, r_p} && bv < r_vmax) begin
                     A_gec[i] = 1'b1;
                     for (j = 0; j < NB; j = j + 1) if (j < nc)
                         A_grup[512*i + 32*j +: 32] = ps_bas[NB*128*i + 128*j + 32*ds[1:0] +: 32];  // D99: 4'e 1
@@ -251,27 +273,37 @@ module dizi_motoru #(
                 A_adr[AW*i +: AW] = r_yaz_bas + wq;
             end
             if (fz == 2'd1) begin                                                          // BP: HATA[l-1] ve maske
-                // satır R'nin 16'lık bloğu: s1'de z, s2'de 2z + (−1 | 0 | +1) (e = R − 32z)
-                e = R - 32*zz;
-                satir_pay = (s == 1 || (e >= 0 && e < 16)) ? {AW{1'b0}} : (e < 0) ? -w : w;
-                A_adr[AW*i +: AW]  = r_yaz_bas  + satir_pay + C;
-                A_madr[AW*i +: AW] = r_mask_bas + satir_pay + C;
+                if (s != 1) begin
+                    // satır bloğu 2z − 1 / 2z / 2z + 1: e = R − 32z = u − p
+                    Cs = bv - r_p;
+                    bk = bu - r_p[3:0];
+                    satir_pay = ({3'd0, bu} < {1'b0, r_p}) ? -w : ({3'd0, bu} < r_p16) ? {AW{1'b0}} : w;
+                end
+                A_adr[AW*i +: AW]  = r_yaz_bas  + satir_pay + Cs;
+                A_madr[AW*i +: AW] = r_mask_bas + satir_pay + Cs;
             end
-            A_bank[4*i +: 4] = (fz == 2'd2) ? i[3:0] : R[3:0];
+            A_bank[4*i +: 4] = bk;
         end
     end
+
+    // ---- Aşama P (D106, Faz 4): A'nın çıkışları bir register'da; LMS, G'ye gönderim ve maske okuması P'den ----
+    // (en kötü yol A'nın seçimi -> LMS -> G'nin CE'siydi; şimdi iki çevrime bölünmüş). Veri aynı, komut başına +1 çevrim.
+    reg [NB*512-1:0] P_grup;
+    reg [NB-1:0]     P_gec;
+    reg [NB*AW-1:0]  P_adr, P_madr;
+    reg [NB*4-1:0]   P_bank;
 
     genvar gi;
     generate
         for (gi = 0; gi < NB; gi = gi + 1) begin : lms
-            lms_group16 u_lms (.group_in_flat(A_grup[512*gi +: 512]), .hedef(hedef),
+            lms_group16 u_lms (.group_in_flat(P_grup[512*gi +: 512]), .hedef(hedef),
                                .group_out_flat(lms_c8[128*gi +: 128]), .tasma_flat(),
                                .l_out(lms_l[6*gi +: 6]), .B_out(lms_B[6*gi +: 6]));
         end
     endgenerate
 
     // paylaşılan G (Egemen'in global_max_reducer16'sı); İŞ_BAŞLA'da sıfırlanır
-    global_max_reducer16 u_G (.clk(clk), .rst(rst | is_basla), .push(A_gec), .B_flat(lms_B),
+    global_max_reducer16 u_G (.clk(clk), .rst(rst | is_basla), .push(P_gec), .B_flat(lms_B),
                               .hedef(hedef), .B_max(), .G(G_out));
 
     // ---- Aşama B (A'nın bir çevrim sonrası) ----
@@ -284,7 +316,7 @@ module dizi_motoru #(
     // Maske (AKT[l-1]) GMS'i: ayrı bir takım yerine ön-getirmenin GMS'i, G = G_akt[l-1] (D100)
     wire [NB*128-1:0] maske_gms = og_gms;
 
-    // Okuma adresi: ön-getirme meşgulken onun, değilse maske okuması (aşama A)
+    // Okuma adresi: ön-getirme meşgulken onun, değilse maske okuması (aşama P; veri B'de)
     integer bi_, ki, kb_;
     reg [7:0] e8, a8;
     reg [3:0] ysec; reg yvar;
@@ -293,7 +325,7 @@ module dizi_motoru #(
         else begin
             v_oku_adr = {NB*AW{1'b0}};
             for (bi_ = 0; bi_ < NB; bi_ = bi_ + 1)
-                if (A_gec[bi_]) v_oku_adr[AW*A_bank[4*bi_ +: 4] +: AW] = A_madr[AW*bi_ +: AW];
+                if (P_gec[bi_]) v_oku_adr[AW*P_bank[4*bi_ +: 4] +: AW] = P_madr[AW*bi_ +: AW];
         end
         // D99: yazma, bank (hedef) tarafından kurulur. Bank kb için kaynak satır = B_bank'ı kb olan son geçerli
         // satır (önceki yazımın "son yazan kazanır"ıyla aynı); veri 16'ya 1 seçilir, maske kb'nin kendi GMS
@@ -341,13 +373,14 @@ module dizi_motoru #(
     integer bq;
     always @(posedge clk) begin
         bitti <= 1'b0; og_basla <= 1'b0;
-        // aşama A -> B
-        B_gec <= A_gec; B_c8 <= lms_c8; B_l <= lms_l; B_adr <= A_adr; B_bank <= A_bank;
+        // aşama A -> P -> B (D106)
+        P_grup <= A_grup; P_gec <= A_gec; P_adr <= A_adr; P_madr <= A_madr; P_bank <= A_bank;
+        B_gec <= P_gec; B_c8 <= lms_c8; B_l <= lms_l; B_adr <= P_adr; B_bank <= P_bank;
         B_islem <= (fz == 2'd0 && relu_l) ? 2'd1 : (fz == 2'd1 && relu_once) ? 2'd2 : 2'd0;
         if (is_basla) hedef <= hedef_in;
         // BP s2 son geçişinde çıkışları kaydet
         if (rst) begin
-            durum <= M_BOS; B_gec <= {NB{1'b0}};
+            durum <= M_BOS; B_gec <= {NB{1'b0}}; P_gec <= {NB{1'b0}};
         end else case (durum)
             M_BOS: if (basla) begin
                 fz <= faz; ll <= l; bb <= b; kk0 <= k0; kk1 <= k1; zz <= z; ilk_k <= ilk; son_k <= son;
@@ -364,13 +397,13 @@ module dizi_motoru #(
                 cs <= og_T;
                 if (fz == 2'd2) begin
                     if (son_k) begin durum <= M_WG; wq <= 4'd0; end
-                    else durum <= M_SON;
+                    else durum <= M_BEK;
                 end else durum <= M_SON1;
                 end
             end
             M_SON1: begin
                 if (fz == 2'd1 && s != 1 && son_k) begin durum <= M_BP2; dq <= 8'd0; ds <= 8'd0; dh <= 1'b0; end
-                else durum <= M_SON;
+                else durum <= M_BEK;
             end
             M_BP2: begin                                         // (q, şerit, yarı) sırası
                 if (!dh && nr > 8) dh <= 1'b1;
@@ -380,11 +413,12 @@ module dizi_motoru #(
                     else begin
                         ds <= 8'd0;
                         if (dq + 1 < og_T - 1) dq <= dq + 8'd1;
-                        else durum <= M_SON;
+                        else durum <= M_BEK;
                     end
                 end
             end
-            M_WG: if (wq == 4'd8) durum <= M_SON; else wq <= wq + 4'd1;
+            M_WG: if (wq == 4'd8) durum <= M_BEK; else wq <= wq + 4'd1;
+            M_BEK: durum <= M_SON;                               // son grup P'den B'ye
             M_SON: begin durum <= M_BOS; bitti <= 1'b1; end        // aşama B bu çevrimde yazıyor
             default: durum <= M_BOS;
         endcase

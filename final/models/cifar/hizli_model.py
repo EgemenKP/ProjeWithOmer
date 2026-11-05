@@ -23,6 +23,8 @@ DEV = "cuda" if torch.cuda.is_available() else "cpu"
 DOYMA = False              # D59: SRU doymasız (True: ±127, D38 — yalnızca ablasyon için)
 GRUP = 16                  # D76: grup = 16 kanal (0: bütün tensör tek grup — NITI tarzı ablasyon)
 YUVARLAMA_AE = "alg1"      # D33: a ve e için Alg. 1 | "round": NITI'nin RoundShift'i (ablasyon)
+ALT_YARI = "shao"          # SRU-a1: Alg. 1 satır 6'nın alt yarısı. "shao" = f[bp/2, 0] (golden/RTL, Shao'nun yazımı)
+                           # | "niti" = f[bp/2-1, 0] (NITI Alg. 3; ablasyon, 06.11)
 
 _IKI_KUVVET = None
 
@@ -51,7 +53,7 @@ def sru_yuvarla(q32, bp):
     bp2 = torch.where(tek, bp - 1, bp)
     h = bp2 // 2
     ust = f >> h
-    alt = f & ((torch.ones_like(h) << (h + 1)) - 1)
+    alt = f & ((torch.ones_like(h) << (h + (1 if ALT_YARI == "shao" else 0))) - 1)
     q = q + ((bp2 > 0) & (ust > alt)).long()
     q = q * isaret
     if DOYMA:

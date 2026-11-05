@@ -174,6 +174,7 @@ def main():
     ap.add_argument("--tohum", type=int, default=1)
     ap.add_argument("--grup", type=int, default=16, help="SRU grup boyu (D76); 0 = tensör başına (NITI tarzı)")
     ap.add_argument("--doyma", action="store_true", help="SRU ±127 doyması (D38; ablasyon)")
+    ap.add_argument("--alt", default="shao", choices=["shao", "niti"], help="Alg. 1 satır 6 alt yarısı (SRU-a1)")
     ap.add_argument("--ae", default="alg1", choices=["alg1", "round"], help="a/e yuvarlaması (D33; round = NITI)")
     ap.add_argument("--cikti", default="sonuc/deneme")
     ap.add_argument("--olcum", type=int, default=0, help=">0: yalnızca bu kadar adımın süresini ölç")
@@ -185,7 +186,7 @@ def main():
     if a.log:     # konsolsuz (pythonw) koşu için: çıktı ve hatalar dosyaya
         import sys
         sys.stdout = sys.stderr = open(a.log, "a", buffering=1, encoding="utf-8")
-    H.GRUP, H.DOYMA, H.YUVARLAMA_AE = a.grup, a.doyma, a.ae
+    H.GRUP, H.DOYMA, H.YUVARLAMA_AE, H.ALT_YARI = a.grup, a.doyma, a.ae, a.alt
     torch.backends.cudnn.allow_tf32 = False
     torch.backends.cuda.matmul.allow_tf32 = False
     os.makedirs(a.cikti, exist_ok=True)
