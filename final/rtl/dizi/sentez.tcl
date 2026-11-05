@@ -45,7 +45,10 @@ proc raporla {cikti ad} {
     report_utilization -file "$cikti/kaynak_$ad.txt"
     report_utilization -hierarchical -hierarchical_depth 3 -file "$cikti/kaynak_hiyerarsi_$ad.txt"
     report_timing_summary -max_paths 10 -file "$cikti/zamanlama_$ad.txt"
-    report_power -file "$cikti/guc_$ad.txt"
+    # Guc raporu: "sistem" sentezinde (sigmayan tasarim) report_power 25 dk'dan fazla ilerlemedi (05.11, iki kosu);
+    # set guc 0 ile atlanir. Gercek guc place & route sonrasi.
+    global guc
+    if {![info exists guc] || $guc} { report_power -file "$cikti/guc_$ad.txt" }
 }
 
 if {$asama eq "dizi"} {

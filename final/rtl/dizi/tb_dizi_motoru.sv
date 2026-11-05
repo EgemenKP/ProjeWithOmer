@@ -63,7 +63,8 @@ module tb_dizi_motoru_govde;
         .cfg_relu(cfg_relu), .taban_akt(taban_akt), .taban_hata(taban_hata), .taban_grad(taban_grad),
         .taban_agr(taban_agr), .G_akt(G_akt), .G_hata(G_hata),
         .v_oku_adr(m_v_adr), .v_oku_veri(v_veri), .v_yaz_en(m_yaz_en), .v_yaz_adr(m_yaz_adr), .v_yaz_veri(m_yaz_veri),
-        .a_oku_adr(a_adr), .a_oku_veri(a_veri));
+        .a_oku_adr(a_adr), .a_oku_veri(a_veri),
+        .sis_G_sec(1'b0), .sis_G(6'd0), .gms_flat());              // D100: yürütücü yok
 
     integer kontrol = 0, hata = 0, n_ag = 0, n_dizi = 0, n_kelime = 0;
     integer fd, n, i, q, x, v, L, tmp, bank, adr, ll, bekle, hl_bas, hl_son;

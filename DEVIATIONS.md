@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D99**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D101**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -1138,6 +1138,46 @@ sentez sonrası `report_power` iki koşuda da 25 dk'dan fazla ilerlemedi, durdur
   `[Ölçüldü]` XSIM CLI (5 ağ): `tb_dizi_motoru` 10001/10001 (iş sonunda FIFO boş, taşma / eksik yok),
   `tb_sistem_dizi` 10961/10961, 34584 çevrim (D97 ile aynı), `tb_pe_dizi` 2363392/2363392 (yeni port, davranış aynı). Mutasyon (yakalandı): FIFO'dan
   hiç çıkarılmıyor (3214 hata), çıkarma şerit 3 yerine 2'de (2229), son geçişte FIFO'ya yazılmıyor (3283).
+- **Durum:** Claude, 05.11.
+
+**Ara ölçüm, (c) + (d) sonrası sistem sentezi (05.11 gece):** LUT 1.315.312 → 1.235.919, RAMB36 496 → 48 (D98),
+`on_getirme`'nin kendi mantığı 14.997 LUT (D97; GMS takımı hariç), WNS −53,9 ns. `dizi_motoru`'nun kendi mantığı
+hâlâ 893.203 LUT. `[Ölçüldü]` Önce tahmin edilen neden (BP s2 şerit seçiminin 8 bitlik sayaçla 256'ya 1 mux'a
+açılması) yalnızca ~37k LUT'luk etki gösterdi (yine de düzeltildi, D99). Checkpoint'te motorun kendi seviyesindeki
+LUT hücreleri sinyal adına göre sayıldı: ~1.024.000 hücre `v_yaz_veri` (tampona yazma), ~55.000 `lms`, gerisi
+< 10.000. Sentez 33 dk, bellek tepesi 7,2 GB (önceki 56 dk, 13,2 GB).
+
+### D99 — Motorun çıkış yolu: tampona yazma bank tarafından, değişken indisli seçimler daraltıldı (Adım 5c)
+- **Ne:** `dizi_motoru.v`:
+  - **Tampona yazma (asıl kalem):** önceden her satır kendi B_bank'ına değişken indisle yazıyor, ReLU-geri
+    maskesini de değişken indisle 16 bankın GMS çıkışından seçiyordu. Artık bank kb kendi kaynağını seçiyor:
+    B_bank'ı kb olan son geçerli satır (önceki "son yazan kazanır" ile aynı), veri 16'ya 1; maske kb'nin kendi
+    GMS çıkışı (maske aynı banktan okunduğu için değişken seçim gereksiz).
+  - BP s2 boşaltmasında şerit `ds[1:0]` ile (4'e 1; önceden 8 bitlik `ds` × 32 → 256'ya 1), WG akümülatörü
+    `akum_sec` ile 9'a 1 (önceden 4 bitlik `wq` × 32 → 16'ya 1, komşu PE'ye taşan indisler dahil).
+- **Neden:** Mimari aynı (satır başına SRU → tampon bankı, D79/D83); yalnızca seçicilerin yazımı. `[Çıkarım]`
+- **Kanıt:** `[Ölçüldü]` yukarıdaki LUT dökümü. XSIM CLI (5 ağ): `tb_dizi_motoru` 10001/10001, `tb_sistem_dizi`
+  10961/10961, 34584 çevrim (aynı). Mutasyon: maske kaynak satırın bankından (kb yerine) → 2986 hata (yakalandı).
+  Kaynak etkisi aşağıda (D100 ile birlikte ölçüldü).
+- **Durum:** Claude, 05.11.
+
+### D100 — Tek GMS takımı: tampon okuma portunda bank başına bir GMS (Fig. 6)
+- **Ne:** Önceden aynı tampon okuma portunun çıkışını üç ayrı 16'lık `gms_group16` takımı işliyordu: ön-getirmede
+  (PE'ye giden veri, D78), motorda (ReLU-geri maskesi AKT[l−1], D86) ve yürütücüde (CLU'nun AKT[L]'si, WU'nun
+  GRAD'ı). Tamponun tek okuma portu olduğundan üçü hiçbir zaman aynı anda gerçek veri işlemiyordu. Artık yalnızca
+  ön-getirmedeki takım var; G, okuma portunu bir önceki çevrimde kullanan birimin G'si (veri bir çevrim sonra
+  geldiği için sahip bir register'da): ön-getirmenin yükleme fazı → kendi G'si, motorun maske okuması →
+  G_akt[l−1], yürütücü → CLU'da G_akt[L], WU'da G_grad[l].
+- **Kanıt:** `[PDF şekil]` Fig. 6: tek "SRU (GMS)" bloğu, Buffer → GMS → PE yolunda; `[PDF tam]` III-B: "Before
+  the int8 values are passed to PEs for the next stage computation, they need to be scaled by the second stage
+  (GMS)". `[Çıkarım]` Maske ve CLU / WU okumalarının da aynı GMS'ten geçmesi Fig. 6'da yok; veri aynı tampondan
+  geldiği için ortak kullanıldı. Fig. 6'ya önceki yapıdan daha yakın (iki ek takım şekilde yoktu).
+  `[Ölçüldü]` XSIM CLI (5 ağ): `tb_on_getirme` 1595333/1595333, `tb_dizi_motoru` 10001/10001, `tb_sistem_dizi`
+  10961/10961, 34584 çevrim. Mutasyon: maske G'si ön-getirmenin G'si → 3817 hata; yürütücünün G'si seçilmiyor →
+  3426 hata (yakalandı). Sahibin register'sız (aynı çevrimin) seçimi → yakalanmadı: bugünkü komut akışında sahip
+  hiçbir zaman bir okuma ile verisinin arasında değişmiyor (ön-getirmenin son verisi D_BEKLE'de, motorun son maske
+  verisi M_SON'da, sonraki okuma ancak yeni komutla), iki yazım eşdeğer; register'lı hâl her akış için doğru
+  olduğundan o tutuldu.
 - **Durum:** Claude, 05.11.
 
 ---

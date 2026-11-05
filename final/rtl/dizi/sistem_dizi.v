@@ -106,6 +106,15 @@ module sistem_dizi #(
     assign dis_v_oku_veri = v_veri;
     assign dis_a_oku_veri = a_veri;
 
+    // ---- GMS (yürütücünün okumaları: CLU'nun AKT[L]'si, WU'nun GRAD'ı) ----
+    // D100: ayrı bir takım yok; ön-getirmedeki tek GMS takımı (Fig. 6), G = y_G. Okuma portunu bir önceki çevrimde
+    // yürütücü kullandıysa (dış port ve motor boştaysa) bu çevrimin verisi onun.
+    reg  [5:0]        y_G;
+    wire [NB*128-1:0] y_gms;
+    reg               y_sahip_r;
+    initial y_sahip_r = 1'b0;
+    always @(posedge clk) y_sahip_r <= !dis_aktif && !m_mesgul;
+
     // ---- dizi motoru ----
     reg m_is_basla, m_basla;
     wire m_bitti;
@@ -117,18 +126,9 @@ module sistem_dizi #(
         .cfg_relu(cfg_relu), .taban_akt(taban_akt), .taban_hata(taban_hata), .taban_grad(taban_grad),
         .taban_agr(taban_agr), .G_akt(G_akt), .G_hata(G_hata),
         .v_oku_adr(m_v_adr), .v_oku_veri(v_veri), .v_yaz_en(m_v_yaz_en), .v_yaz_adr(m_v_yaz_adr),
-        .v_yaz_veri(m_v_yaz_veri), .a_oku_adr(m_a_adr), .a_oku_veri(a_veri));
+        .v_yaz_veri(m_v_yaz_veri), .a_oku_adr(m_a_adr), .a_oku_veri(a_veri),
+        .sis_G_sec(y_sahip_r), .sis_G(y_G), .gms_flat(y_gms));
 
-    // ---- GMS (yürütücünün okumaları: CLU'nun AKT[L]'si, WU'nun GRAD'ı) ----
-    reg  [5:0]        y_G;
-    wire [NB*128-1:0] y_gms;
-    genvar gk;
-    generate
-        for (gk = 0; gk < NB; gk = gk + 1) begin : ygms
-            gms_group16 u_g (.lms_in_flat(v_veri[134*gk +: 128]), .l_in(v_veri[134*gk + 128 +: 6]),
-                             .G(y_G), .group_out_flat(y_gms[128*gk +: 128]), .tasma_flat());
-        end
-    endgenerate
 
     // ---- CLU (fe_top'un CLU yolu) ----
     reg          clu_basla;

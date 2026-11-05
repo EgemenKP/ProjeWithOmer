@@ -48,6 +48,11 @@ module on_getirme #(
     input  wire [NB*134-1:0]        v_oku_veri,
     output reg  [NB*AW-1:0]         a_oku_adr,
     input  wire [NB*72-1:0]         a_oku_veri,
+    // D100: Fig. 6'nın tek GMS'i (bank başına bir). Tamponun okuma portunu bir önceki çevrimde başka bir birim
+    // kullandıysa (motorun ReLU-geri maskesi, yürütücünün CLU / WU okuması) bu çevrimin verisi onun: G = dis_G.
+    input  wire                     dis_G_sec,
+    input  wire [5:0]               dis_G,
+    output wire [NB*128-1:0]        gms_flat,
     // diziye
     output reg  [2:0]               mod,
     output reg  [NB*24-1:0]         satir_akis1_flat, satir_akis2_flat, satir_akis3_flat,
@@ -171,15 +176,17 @@ module on_getirme #(
             o_say <= o_say + 1'b1;
     end
 
-    // ---- GMS: bank başına bir gms_group16 (D78) ----
+    // ---- GMS: bank başına bir gms_group16 (D78); sistemin tek GMS takımı (D100) ----
     wire [NB*128-1:0] gms_cikis;
+    wire [5:0]        gms_G = dis_G_sec ? dis_G : R_G;
+    assign gms_flat = gms_cikis;
     genvar gk;
     generate
         for (gk = 0; gk < NB; gk = gk + 1) begin : gms
             gms_group16 u_gms (
                 .lms_in_flat(v_oku_veri[134*gk +: 128]),
                 .l_in(v_oku_veri[134*gk + 128 +: 6]),
-                .G(R_G),
+                .G(gms_G),
                 .group_out_flat(gms_cikis[128*gk +: 128]),
                 .tasma_flat()
             );

@@ -60,7 +60,11 @@ module dizi_motoru #(
     output reg  [NB*AW-1:0]         v_yaz_adr,
     output reg  [NB*134-1:0]        v_yaz_veri,
     output wire [NB*AW-1:0]         a_oku_adr,
-    input  wire [NB*72-1:0]         a_oku_veri
+    input  wire [NB*72-1:0]         a_oku_veri,
+    // D100: tek GMS takımı (ön-getirmede). sis_G_sec: bu çevrimin okuma verisi yürütücünün (G = sis_G)
+    input  wire                     sis_G_sec,
+    input  wire [5:0]               sis_G,
+    output wire [NB*128-1:0]        gms_flat
 );
 
     // M_ONGET: ön-getirmenin yükleme ve akış fazları (akış = og_akis)
@@ -104,11 +108,19 @@ module dizi_motoru #(
     wire [7:0]        og_t, og_T;
     wire [NB*AW-1:0]  og_v_adr;
     reg               og_basla;
+    // D100: okuma portunu bu çevrim ön-getirme mi (yükleme fazları) yoksa motorun maske okuması mı kullanıyor;
+    // veri bir sonraki çevrimde geldiği için sahip bir çevrim register'da.
+    reg               maske_sahip_r;
+    wire [NB*128-1:0] og_gms;
+    initial maske_sahip_r = 1'b1;
+    always @(posedge clk) maske_sahip_r <= !(og_mesgul && !og_akis);
+    assign gms_flat = og_gms;
     on_getirme #(.NB(NB), .AW(AW), .LMAX(LMAX), .HMAX(HMAX), .WMAX(WMAX)) u_og (
         .clk(clk), .rst(rst), .basla(og_basla), .faz(fz), .l(ll), .b(bb), .k0(kk0), .k1(kk1), .z(zz),
         .cfg_cin(cfg_cin), .cfg_cout(cfg_cout), .cfg_h(cfg_h), .cfg_w(cfg_w), .cfg_s(cfg_s), .cfg_p(cfg_p),
         .taban_akt(taban_akt), .taban_hata(taban_hata), .taban_agr(taban_agr), .G_akt(G_akt), .G_hata(G_hata),
         .v_oku_adr(og_v_adr), .v_oku_veri(v_oku_veri), .a_oku_adr(a_oku_adr), .a_oku_veri(a_oku_veri),
+        .dis_G_sec(sis_G_sec | maske_sahip_r), .dis_G(sis_G_sec ? sis_G : G_akt[6*(ll-1) +: 6]), .gms_flat(og_gms),
         .mod(og_mod), .satir_akis1_flat(og_a1), .satir_akis2_flat(og_a2), .satir_akis3_flat(og_a3),
         .sutun_w_flat(og_w), .akis(og_akis), .t(og_t), .T(og_T), .bitti(og_bitti), .mesgul(og_mesgul));
 
@@ -194,6 +206,21 @@ module dizi_motoru #(
         r_mask_bas <= taban_akt[AW*g_li +: AW] + g_bp_ic;
     end
 
+    // D99: değişken indisli parça seçimleri yalnızca geçerli değerler kadar mux olsun. Önceden ps_bas'ın şeridi
+    // 8 bitlik ds ile ve WG akümülatörü 4 bitlik wq ile çarpılarak seçiliyordu: sentez her PE için tüm vektör
+    // üzerinde 256'ya 1 (ve 16'ya 1) seçici kuruyordu.
+    function [31:0] akum_sec;                        // PE'nin 9 akümülatöründen q.
+        input [287:0] gv;
+        input [3:0]   q;
+        begin
+            case (q)
+                4'd0: akum_sec = gv[0 +: 32];   4'd1: akum_sec = gv[32 +: 32];  4'd2: akum_sec = gv[64 +: 32];
+                4'd3: akum_sec = gv[96 +: 32];  4'd4: akum_sec = gv[128 +: 32]; 4'd5: akum_sec = gv[160 +: 32];
+                4'd6: akum_sec = gv[192 +: 32]; 4'd7: akum_sec = gv[224 +: 32]; default: akum_sec = gv[256 +: 32];
+            endcase
+        end
+    endfunction
+
     integer i, j, R, C, sr, xr, kanal_sec, e;
     reg [AW-1:0] satir_pay;
     always @* begin
@@ -213,11 +240,11 @@ module dizi_motoru #(
                 if (R >= 0 && R < h && C >= 0 && C < w) begin
                     A_gec[i] = 1'b1;
                     for (j = 0; j < NB; j = j + 1) if (j < nc)
-                        A_grup[512*i + 32*j +: 32] = ps_bas[NB*128*i + 128*j + 32*ds +: 32];
+                        A_grup[512*i + 32*j +: 32] = ps_bas[NB*128*i + 128*j + 32*ds[1:0] +: 32];  // D99: 4'e 1
                 end
             end else if (durum == M_WG && i < nr) begin                                   // WG
                 A_gec[i] = 1'b1;
-                for (j = 0; j < NB; j = j + 1) if (j < nc) A_grup[512*i + 32*j +: 32] = g[288*(i*NB + j) + 32*wq +: 32];
+                for (j = 0; j < NB; j = j + 1) if (j < nc) A_grup[512*i + 32*j +: 32] = akum_sec(g[288*(i*NB + j) +: 288], wq);
                 A_adr[AW*i +: AW] = r_yaz_bas + wq;
             end
             if (fz == 2'd1) begin                                                          // BP: HATA[l-1] ve maske
@@ -251,17 +278,13 @@ module dizi_motoru #(
     reg  [NB*AW-1:0]  B_adr;
     reg  [NB*4-1:0]   B_bank;
     reg  [1:0]        B_islem;                  // 0 yok, 1 ReLU, 2 ReLU-geri
-    wire [NB*128-1:0] maske_gms;
-    generate
-        for (gi = 0; gi < NB; gi = gi + 1) begin : mgms
-            gms_group16 u_g (.lms_in_flat(v_oku_veri[134*gi +: 128]), .l_in(v_oku_veri[134*gi + 128 +: 6]),
-                             .G(G_akt[6*(ll-1) +: 6]), .group_out_flat(maske_gms[128*gi +: 128]), .tasma_flat());
-        end
-    endgenerate
+    // Maske (AKT[l-1]) GMS'i: ayrı bir takım yerine ön-getirmenin GMS'i, G = G_akt[l-1] (D100)
+    wire [NB*128-1:0] maske_gms = og_gms;
 
     // Okuma adresi: ön-getirme meşgulken onun, değilse maske okuması (aşama A)
-    integer bi_, ki;
+    integer bi_, ki, kb_;
     reg [7:0] e8, a8;
+    reg [3:0] ysec; reg yvar;
     always @* begin
         if (og_mesgul && !og_akis) v_oku_adr = og_v_adr;        // ön-getirmenin yükleme fazları
         else begin
@@ -269,18 +292,27 @@ module dizi_motoru #(
             for (bi_ = 0; bi_ < NB; bi_ = bi_ + 1)
                 if (A_gec[bi_]) v_oku_adr[AW*A_bank[4*bi_ +: 4] +: AW] = A_madr[AW*bi_ +: AW];
         end
+        // D99: yazma, bank (hedef) tarafından kurulur. Bank kb için kaynak satır = B_bank'ı kb olan son geçerli
+        // satır (önceki yazımın "son yazan kazanır"ıyla aynı); veri 16'ya 1 seçilir, maske kb'nin kendi GMS
+        // çıkışı (maske aynı banktan okundu). Önceden kaynak tarafından yazılıyordu (her satır değişken indisle
+        // her banka): sentez ~1M LUT kuruyordu (05.11 ölçümü, `v_yaz_veri`).
         v_yaz_en = {NB{1'b0}}; v_yaz_adr = {NB*AW{1'b0}}; v_yaz_veri = {NB*134{1'b0}};
-        for (bi_ = 0; bi_ < NB; bi_ = bi_ + 1) if (B_gec[bi_]) begin
-            v_yaz_en[B_bank[4*bi_ +: 4]] = 1'b1;
-            v_yaz_adr[AW*B_bank[4*bi_ +: 4] +: AW] = B_adr[AW*bi_ +: AW];
-            for (ki = 0; ki < 16; ki = ki + 1) begin
-                e8 = B_c8[128*bi_ + 8*ki +: 8];
-                a8 = maske_gms[128*B_bank[4*bi_ +: 4] + 8*ki +: 8];
-                if (B_islem == 2'd1 && $signed(e8) < 0) e8 = 8'd0;                    // ReLU
-                if (B_islem == 2'd2 && !($signed(a8) > 0)) e8 = 8'd0;                // ReLU-geri (D86)
-                v_yaz_veri[134*B_bank[4*bi_ +: 4] + 8*ki +: 8] = e8;
+        for (kb_ = 0; kb_ < NB; kb_ = kb_ + 1) begin
+            yvar = 1'b0; ysec = 4'd0;
+            for (bi_ = 0; bi_ < NB; bi_ = bi_ + 1)
+                if (B_gec[bi_] && B_bank[4*bi_ +: 4] == kb_) begin yvar = 1'b1; ysec = bi_; end
+            if (yvar) begin
+                v_yaz_en[kb_] = 1'b1;
+                v_yaz_adr[AW*kb_ +: AW] = B_adr[AW*ysec +: AW];
+                for (ki = 0; ki < 16; ki = ki + 1) begin
+                    e8 = B_c8[128*ysec + 8*ki +: 8];
+                    a8 = maske_gms[128*kb_ + 8*ki +: 8];
+                    if (B_islem == 2'd1 && $signed(e8) < 0) e8 = 8'd0;                    // ReLU
+                    if (B_islem == 2'd2 && !($signed(a8) > 0)) e8 = 8'd0;                // ReLU-geri (D86)
+                    v_yaz_veri[134*kb_ + 8*ki +: 8] = e8;
+                end
+                v_yaz_veri[134*kb_ + 128 +: 6] = B_l[6*ysec +: 6];
             end
-            v_yaz_veri[134*B_bank[4*bi_ +: 4] + 128 +: 6] = B_l[6*bi_ +: 6];
         end
     end
 

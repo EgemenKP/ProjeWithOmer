@@ -58,6 +58,8 @@ module tb_on_getirme_govde;
         .cfg_cin(cfg_cin), .cfg_cout(cfg_cout), .cfg_h(cfg_h), .cfg_w(cfg_w), .cfg_s(cfg_s), .cfg_p(cfg_p),
         .taban_akt(taban_akt), .taban_hata(taban_hata), .taban_agr(taban_agr), .G_akt(G_akt), .G_hata(G_hata),
         .v_oku_adr(v_adr), .v_oku_veri(v_veri), .a_oku_adr(a_adr), .a_oku_veri(a_veri),
+        .dis_G_sec(1'b0), .dis_G(6'd0), .gms_flat(),               // D100: tek birim
+
         .mod(mod), .satir_akis1_flat(a1), .satir_akis2_flat(a2), .satir_akis3_flat(a3), .sutun_w_flat(sw),
         .akis(akis), .t(t), .T(T), .bitti(bitti), .mesgul(mesgul));
 
