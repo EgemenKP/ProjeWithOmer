@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D104**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D105**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -1199,6 +1199,22 @@ LUT hücreleri sinyal adına göre sayıldı: ~1.024.000 hücre `v_yaz_veri` (ta
   bank başına 3307 adres) dahil ag1–ag6: `tb_fsm_dizi` 80832/80832 (8082 komut), `tb_on_getirme` 25054785/25054785,
   `tb_dizi_motoru` 57957/57957, `tb_sistem_dizi` 65142/65142 (411757 çevrim). İlk kez denenen birleşimler: 3 kanal
   karosu × iki satır karosu, batch 4, 8 katman, 1×1 çıkışlı s2 son katman.
+- **Durum:** Claude, 05.11.
+
+### D104 — PE'de gereksiz sıfırlama kapıları kaldırıldı (Faz 3, yazım küçültmesi)
+- **Ne:** (1) `pe_birlesik.v`: seçili olmayan modda `cikis_flat` / `g_flat`'ı 0'a çeken kapılar kalktı; çıkış
+  `{m5, m4, top2, bp2 ? top1 : top2}`, akümülatörler doğrudan. (2) `pe_dizi.v`: Psum FIFO başının üst şeritlerini
+  (1–3) BP s2 dışında 0'a çeken 96 bitlik mux kalktı. İlk geçişte kısmi toplamı 0 yapan `ps_sec` ve `b_gec`
+  sıfırlamaları (işlevsel) kaldı.
+- **Neden:** Shao Fig. 2'de bu kapılar yok; tüketiciler moda göre doğru şeridi zaten seçiyor (motor FP / BP s1'de
+  şerit 0, BP s2'de 4 şerit, WG'de akümülatör; pe_birlesik'te port 3'ü yalnızca FP/BP zincir başı (0,0) ve BP s2'nin
+  zincir başları seçer). Tek PE ölçümü (sentez, `flatten none`): 1006 → 622 LUT. Mimari aynı. `[Ölçüldü]` `[Çıkarım]`
+- **Kanıt:** `[Ölçüldü]` Egemen'in 7 PE testi (kendi vektörleri, kabuklarla) 38/38, 38/38, 34/34, 24/24, 32/32, 5/5,
+  5/5; `tb_pe_dizi` 2363392/2363392 (referansı kısmi toplamı kendisi kurduğu için (2)'yi bağımsız sınar);
+  `tb_dizi_motoru` 57957/57957, `tb_sistem_dizi` 65142/65142 (411757 çevrim, aynı). Not: `tb_pe_dizi`'nin referansı
+  `pe_birlesik`'in kendisi, (1) için tek başına kanıt değil. Mutasyon (yakalandı): FP/BP s1'de şerit 0 = top1 →
+  PE testlerinde 21–32 hata; (2)'de şerit 1 b_gec yerine a_ps → 430043 hata; şerit 0 a_ps yerine b_gec → 1895162 hata.
+  Kaynak etkisi Faz 3 ölçüm kapısı A'da (sentez, eğitim koşuları arasında).
 - **Durum:** Claude, 05.11.
 
 ---

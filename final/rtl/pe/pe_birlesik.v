@@ -37,7 +37,7 @@
 //    w_flat  [71:0]: 9 ağırlık, w[i][j] = w_flat[(3i+j)*8 +: 8]
 //    akis1/2/3     : satır r'nin akışları ([8r +: 8]), sarmalayıcıdaki anlamlarıyla
 //    ps_flat [127:0]: FP/BP s1: k=0 ps_in; BP s2: k=0 psA0, 1 psB0, 2 psA1, 3 psB1
-//    cikis_flat[127:0], g_flat[287:0]: sarmalayıcıdaki gibi (seçili olmayan modda 0)
+//    cikis_flat[127:0], g_flat[287:0]: sarmalayıcıdaki gibi; D104'ten beri seçili olmayan şeritler / modda 0 değil
 //  Yazan: Claude, 03.11.2026 (final/, Adım 5 öncesi)
 // =============================================================================
 `timescale 1ns/1ps
@@ -127,14 +127,16 @@ module pe_birlesik (
     wire signed [31:0] top1 = (s_bp2 ? m[1] : m[2]) + (s_bp2 ? m[7] : m[5]);
     wire signed [31:0] top2 = (s_bp2 ? m[2] : top1) + m[8];
 
-    assign cikis_flat = s_zincir ? {96'd0, top2} :
-                        s_bp2    ? {m[5], m[4], top2, top1} :
-                                   128'd0;
+    // D104 (Faz 3): seçili olmayan modda çıkışı 0'a çeken kapılar kaldırıldı (Shao'da yok; PE başına ~380 LUT).
+    // Tüketiciler zaten moda göre doğru şeridi alıyor: FP / BP s1'de şerit 0 (= top2), BP s2'de 4 şerit, WG'de
+    // akümülatörler (g). FIFO'ya yazılan üst şeritler FP / BP s1'de MAC'e girmez (pe_dizi o modlarda yalnızca şerit 0'ı
+    // verir). Boşta (mod 6/7) ve kullanılmayan şeritler artık 0 değil, anlamsız.
+    assign cikis_flat = {m[5], m[4], top2, s_bp2 ? top1 : top2};
 
     genvar q;
     generate
         for (q = 0; q < 9; q = q + 1) begin : g_cikis
-            assign g_flat[32*q +: 32] = s_wg ? m[q] : 32'd0;
+            assign g_flat[32*q +: 32] = m[q];
         end
     endgenerate
 

@@ -97,8 +97,9 @@ module pe_dizi #(
                     b_gec <= (ps_oku && !bos && !ps_temizle) ? bas : 128'd0;
 
                 wire [127:0] a_ps = ps_sec ? bas : 128'd0;
-                wire [127:0] ps   = (mod == BP_S2) ? {b_gec[96 +: 32], a_ps[64 +: 32], b_gec[32 +: 32], a_ps[0 +: 32]}
-                                                   : {96'd0, a_ps[0 +: 32]};
+                // D104 (Faz 3): üst şeritler (1-3) yalnızca BP s2'de MAC'e girer (pe_birlesik'te port 3'ü yalnızca
+                // BP s2'nin zincir başları seçer); diğer modlarda 0'a çekilmeleri gereksizdi (96 bitlik mux kalktı).
+                wire [127:0] ps   = {b_gec[96 +: 32], a_ps[64 +: 32], b_gec[32 +: 32], a_ps[0 +: 32]};
 
                 // WG'de hata sütun hattından (D73)
                 wire [23:0] sutun_e = sutun_w_flat[72*c +: 24];
