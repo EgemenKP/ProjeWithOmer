@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D108**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D109**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -1371,6 +1371,30 @@ eğitimin FPGA'da mı yazılım modelinde mi yapıldığı metinde yazmıyor. NI
   %76,45, eğitim %74,73 (1. epoch %36,1; 10. %68,2; 20. %71,8). Önceden belirlenen eşik ≥ %70 → çerçeve sağlam
   (NITI'nin 200 epoch sonucu %90,7). Sonuç: VGG16-like'ın ~%25'i çerçevedeki bir hatadan değil, 14 katmanlı BN'siz ağın
   bu ayarlarla eğitilmesinden. `[Ölçüldü]` `sonuc/niti_vggsmall7_b128/egri.csv` (30. epoch'ta durduruldu, durum.pt saklı).
+
+### D108 — Table II'nin GOPS'u: RTL'in komut başına çevrim modeli, tepe ve etkin GOPS (Faz 5)
+- **Ne:** `final/models/sistem/gops_modeli.py`. Bir eğitim adımının çevrimi = FSM'in komut listesi (golden'ın
+  `komut_sablonu` döngüleri, analitik sayılır) × komut başına çevrim formülü (RTL'in durum sırasından):
+  FP 12 + w·⌈h/16⌉ + T; BP 27 + wo·⌈ho/16⌉ + T (+ s2 son geçişte 4(T−1), etkin satır > 8 ise ×2); WG
+  11 + w + wo + T (+1 ilk, +9 son); ÖLÇEK / SA / İŞ_BAŞLA / BİTTİ 4, CLU 85, WU 15. `tb_sistem_dizi`'ye
+  komut izi eklendi (`komut_cevrim.txt`; PASS/FAIL'i etkilemez).
+- **Neden:** Shao GOPS'un hesabını yazmıyor (Table II ve s. 1'de yalnızca "771 GOPS ... at 200MHz"). Tepe
+  2304 MAC × 2 × 200 MHz = 921,6 GOPS; 771 bunun %83,7'si `[Çıkarım]` (Shao bu oranı söylemiyor).
+- **Kanıt:** `[Ölçüldü]` Model, `tb_sistem_dizi`'nin izine karşı 8082 komutun hepsinde 0 sapma; ağ toplamları
+  ag1–ag6 2518, 3722, 5736, 9746, 13621, 383657 çevrim, izle aynı (sim PASS 65142/65142, 419000 çevrim).
+  Kontrol: VGG16-like'ın görüntü başına FP MAC'i 313,2 M (VGG16'nın CIFAR'daki konvolüsyon MAC'iyle aynı mertebe).
+- **Sonuç (VGG16-like D101, batch 256, bir adım FP + CLU + BP + WG + WU):** 58,95 M komut, 1.766 M çevrim =
+  8,83 s @ 200 MHz; 480,2 GOP (2 × MAC) → **etkin 54,4 GOPS (tepenin %5,9'u; Shao 771)**. Döküm: çevrimlerin %20'si
+  akış, %80'i yükleme + komut başı/sonu. Akış çevrimlerinde MAC kullanımı %29,5 (küçük haritalarda 16 satırın
+  azı dolu: 4×4, 2×2 katmanlar; akış boyuna dolgu sütunları dahil). Yükleme tam örtüşseydi üst sınır 272 GOPS.
+  `[Ölçüldü (model, RTL'e komut komut eşit)]`
+- **Fark nedeni (dürüst):** (1) D50: komutlar sırayla; her DİZİ komutu kanalın haritasını tampondan yeniden
+  yükler, yükleme akışla örtüşmez (Shao Fig. 8'de ön-getirme ayrı modül; çift tamponlama ima edilebilir ama metinde
+  yok). (2) Dizi eşlemesi (D72/D73): FP/BP'de satırlara çıkış satırı; derin katmanlarda harita 16 satırdan küçük.
+  Bunlar mimari tercih; durdurma kuralı gereği değiştirilmiyor, tezde sınırlama olarak yazılır.
+- **Sınırlama:** Bütün verinin çip üstünde olduğu varsayılır (VGG16-like batch 256 gerçekte 824 RAMB36'ya sığmaz;
+  harici bellek modeli yok, Shao da anlatmıyor). GOPS/W için güç: Faz 4'ün `report_power`'ı (henüz yok).
+- **Durum:** Claude, 06.11.
 
 ---
 

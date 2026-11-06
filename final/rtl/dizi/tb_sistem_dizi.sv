@@ -63,6 +63,22 @@ module tb_sistem_dizi_govde;
     reg [133:0] kel;
     reg [71:0]  wk;
 
+    // Faz 5 (06.11): komut başına çevrim izi -> komut_cevrim.txt (yalnızca ölçüm; PASS/FAIL'i etkilemez)
+    // Satır: ag_no op faz l b x y z a1 a2 cevrim; cevrim = önceki kom_bitti'den (ya da basla'dan) bu komutun
+    // kom_bitti'sine kadar geçen çevrim (FSM'in komutlar arası çevrimleri dahil). Toplamı ~ "egitim adimi" çevrimi.
+    integer kfd = 0, k_cev = 0, kf;
+    always @(posedge clk) begin
+        if (basla) k_cev <= 0;
+        else if (dut.kom_bitti) begin
+            if (kfd == 0) kfd = $fopen("komut_cevrim.txt", "w");
+            $fwrite(kfd, "%0d", n_ag);
+            for (kf = 0; kf < 10; kf = kf + 1) $fwrite(kfd, " %0d", dut.kom[16*kf +: 16]);
+            $fwrite(kfd, " %0d\n", k_cev + 1);
+            if (dut.kom[3:0] == 4'd7) $fflush(kfd);
+            k_cev <= 0;
+        end else k_cev <= k_cev + 1;
+    end
+
     task automatic dosya_ac(input string alt, input string isim);
         yol = {dizin, alt, isim};
         fd = $fopen(yol, "r");
