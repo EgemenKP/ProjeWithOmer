@@ -9,8 +9,8 @@ Etiketler: `[Ölçüldü]` araçla ölçülen sayı; `[Çıkarım]` makalede yaz
 | Kaynak | Shao | Bizim | Not |
 |---|---|---|---|
 | LUT | 171.248 (%39,5) | 422.611 (%97,6) | `[Ölçüldü]` sentez, `flatten none`; pe_dizi 148.214 + sistem 274.397 (D103–D106 sonrası) |
-| LUTRAM | 24.704 | ≥ 44.032 (yalnızca pe_dizi) | `[Ölçüldü]` pe_dizi'nin Psum FIFO'ları; sistem parçası `[Bekliyor]` |
-| FF | 143.565 | — | `[Bekliyor]` zamanlamaya duyarlı sentezde ölçülecek |
+| LUTRAM | 24.704 | 45.182 | `[Ölçüldü]` pe_dizi 44.032 (256 PE'nin Psum FIFO'ları) + sistem 1.150 |
+| FF | 143.565 | 68.234 | `[Ölçüldü]` pe_dizi 40.192 + sistem 28.042 (D107'nin ~100 FF'i hariç) |
 | BRAM (RAMB36) | 896 | 824 | `[Ölçüldü]`; tampon boyu Shao'da yok, Table I'e yakın seçildi (D103, `[Çıkarım]`) |
 | DSP | 2.324 | 2.359 | `[Ölçüldü]` 2304 MAC (D105, DSP48E1'de) + 55 (SRU/CLU) |
 
