@@ -1277,6 +1277,11 @@ sistem 9 dk 19 sn, bellek tepesi 6,6 GB.
   `SIM_DAVRANISSAL`; `tb_pe_birlesik` ve `tb_veriyolu` yalnızca modun okunan şeritlerini karşılaştırıyor (D104
   sonrası seçilmeyen şeritler 0 değil). XSIM CLI: `tb_fsm` 6206, `tb_sru_buyuk` 8508, `tb_pe_blok` 380490,
   `tb_pe_birlesik` 80357, `tb_veriyolu` 71048, `tb_sistem` 21415 — altısı PASS (run_sim.tcl'deki beklenenlerle aynı).
+- **Tam regresyon (Faz 7, 06.11 öğleden sonra):** kalan dört klasör XSIM CLI ile, run_sim.tcl'lerin dosya listeleriyle
+  (bölücü davranışsal model): sru `tb_bm_official` 154, `tb_global_max_b` 12, `tb_sround_official` 2297, `tb_sru_array`
+  12, `tb_sru_katman` 52, `tb_sru_top` 52, `tb_lms_uc` 20013, `tb_sru_gradyan` 1865; clu `tb_clu` 40; clu_yuvarlama
+  `tb_stok_yuvarla` 40960; fe `tb_relu` 196608, `tb_wu` 65536, `tb_fe_top` 456144 — 13'ü PASS. Böylece yedi klasörün
+  (pe, sru, clu, clu_yuvarlama, fe, sistem, dizi) hepsi D107 sonrası PASS. Gerçek bölücü IP'siyle Vivado koşusu: Ego.
 - **Durum:** Claude, 06.11.
 
 ---
