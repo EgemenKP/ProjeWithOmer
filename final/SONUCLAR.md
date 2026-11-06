@@ -38,8 +38,8 @@ Etiketler: `[Ölçüldü]` araçla ölçülen sayı; `[Çıkarım]` makalede yaz
 | | Shao (şekilden okunmuş, yaklaşık) | Bizim |
 |---|---|---|
 | VGG16-like, 30. epoch | ~%20 | %77,1 (test doğruluğu %22,92) `[Ölçüldü]` |
-| VGG16-like, 200. epoch | ~%12 | `[Bekliyor]` (koşu sürüyor; 89. epoch'ta %77,2) |
-| VGG16 (max-pool'lu), 200. epoch | ~%12–13 | `[Bekliyor]` (referans koşusu sırada) |
+| VGG16-like, 200. epoch | ~%12 | %78,4 (test doğruluğu %21,63; 30. epoch'tan beri %20–25 bandında, m_u 2 → 1) `[Ölçüldü]` |
+| VGG16 (max-pool'lu), 200. epoch | ~%12–13 | koşulmadı (Ego kararı, 06.11: yalnızca kıyas eğrisi, D102'deki ezberleme testinde aynı derinlikte o da öğrenmedi) |
 
 - Aritmetik çerçeve (hizli_model = golden = RTL, bit bit) NITI'nin kendi ağında doğrulandı: vggsmall7, 30 epoch test
   %76,45 (eşik %70; NITI'nin 200 epoch sonucu %90,7) `[Ölçüldü]`.
