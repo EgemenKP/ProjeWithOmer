@@ -49,6 +49,10 @@ tercihi), `[Varsayım]` (geçici, netleşmemiş).
 | **`final/`: tek PE, 9 MAC (D69)** | Tamamlandı; sistemde sarmalayıcının yerinde | 80.357/80.357 eskiye karşı; Egemen'in PE testleri 176/176 (eski ve yeni PE); sistem testlerinin hepsi aynı sayılarla PASS. Vivado'da gerçek bölücü IP'siyle doğrulandı (Ego, 04.11) | `final/rtl/pe/pe_birlesik.v` |
 | **`final/`: tek SRU (D70) + D68 + D71** | Tamamlandı | SRU testleri hepsi PASS, `tb_lms_uc` 20.013/20.013; Vivado'da doğrulandı (Ego, 04.11) | `final/rtl/sru/` |
 | **`final/`: `run_sim.tcl` (sistem, pe, sru, clu, fe)** | Tamamlandı | Beşi de Vivado'da gerçek bölücü IP'siyle PASS (Ego, 04.11); `tb_sru_gradyan` yalnızca `sru` script'inde (aşağıda 04.11 notu) | `final/rtl/*/run_sim.tcl` |
+| **Adım 5a: 16×16 PE dizisi (D72–D75)** | Tamamlandı; D104/D105 ile güncellendi | `tb_pe_dizi` 2.363.392/2.363.392 (XSIM CLI, D105 sonrası davranışsal DSP modeliyle), 7 mutasyonun 7'si yakalandı | `final/rtl/dizi/pe_dizi.v` |
+| **Adım 5b: 16×16 dizili tam sistem (D76–D93)** | Tamamlandı | ag1–ag4 golden'la bit bit (04.11); bugün ag1–ag6 için aşağıdaki satır geçerli. Vivado'da gerçek bölücü IP'siyle henüz koşulmadı (Ego) | `final/rtl/dizi/`, `final/models/sistem/` |
+| **Adım 5c: donanımlaştırma (D94–D100) + Faz 2–4 (D103–D107)** | Tamamlandı | XSIM CLI, ag1–ag6: `tb_dizi_motoru` 57.957/57.957, `tb_sistem_dizi` 65.142/65.142 (419.000 çevrim); Egemen'in PE testleri DSP modeliyle PASS; Adım 4'ün 6 testi PASS (D107 kaydı). Sentez (`flatten none`): LUT 422.611 (%97,6), RAMB36 824, DSP 2.359, WNS −12,2 ns (D107 öncesi) | `final/rtl/dizi/`, `final/rtl/pe/mac_dsp.v` |
+| **Adım 6: CIFAR-10 (Fig. 9) (D87–D89, D101, D102)** | Sürüyor | `kontrol_hizli.py` 6/6 (hizli_model golden'la bit bit); çerçeve NITI'nin vggsmall7'siyle doğrulandı (30 epoch test %76,45); VGG16-like 200 epoch koşusu sürüyor, VGG16 referansı sırada | `final/models/cifar/` |
 
 ---
 

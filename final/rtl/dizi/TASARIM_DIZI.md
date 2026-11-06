@@ -1,8 +1,21 @@
 # Adım 5b-3: 16×16 Dizili Sistemin Tasarımı (tamponlar, ön-getirme, komutlar)
 
+> **06.11.2026 güncellemesi (Adım 5c donanımlaştırma sonrası).** D80–D86 DEVIATIONS'a yazıldı. Aşağıdaki şu
+> bölümler eskidi; geçerli olan karşılarındaki D maddeleri:
+> - §5 ve §9 D84 satırı, "harita satır register'larında, W + 2p ≤ 18 (W ≤ 16)": **D97** — 33 satırlık line buffer,
+>   satır başına W × 8 bit bellek, **W ≤ WMAX = 32**, H için sınır yok (satır karoları). §10 S2 (32'ye çıkarmak) D97 ile
+>   kapandı.
+> - §4 BP s2 boşaltması "kayıt belleğinde": **D98** — son geçişin 4 şeridi PE'nin kendi Psum FIFO'sunda, FIFO başından
+>   boşaltılır (ayrı bellek yok).
+> - GMS: **D100** — tampon okuma portunda tek GMS takımı (ön-getirmede); maske ve CLU/WU okumaları da aynı takımdan,
+>   G okuma portunun bir önceki çevrimdeki sahibinden.
+> - Döngü sırası (§7): **D94** (FP/BP'de toplanan kanal en içte).
+> - Motorun çıkış yolu: **D99** (bank tarafında yazma), **D106** (komut başı sınırlar, A → P → B aşamaları),
+>   **D107** (LMS → G register'ı).
+> - Parametreler: **D103** — AW 13, LMAX 15, kanal/batch alanları 16 bit.
+
 Bu belge, Adım 4'ün tek PE'li sistemini (`rtl/sistem/TASARIM_FSM.md`, `ARAYUZ_SOZLESMESI.md`) Shao Fig. 8'in
-tam yapısına taşır. Kararların kaydı `DEVIATIONS.md`'de; burada **önerilen** maddeler (D80–D86) Ego onaylayınca
-oraya yazılacak.
+tam yapısına taşır. Kararların kaydı `DEVIATIONS.md`'de.
 
 Kaynaklar: Shao III-A (s. 256), III-B ve Fig. 6 (s. 257), III-D, Fig. 8 ve Table I (s. 258). NITI bu
 bölümdeki kararlarda hakem olamıyor: donanım içermiyor (DEVIATIONS, 5b-3 kararları).
