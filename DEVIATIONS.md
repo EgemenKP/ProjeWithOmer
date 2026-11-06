@@ -1357,6 +1357,11 @@ eğitimin FPGA'da mı yazılım modelinde mi yapıldığı metinde yazmıyor. NI
     farkların çoğu gürültü bandında; açık ve tutarlı bir iyileşme yok. Karar: değişiklik yapılmadı (Ego ile 06.11 gece
     anlaşması: belirsiz sonuçta değiştirme). Yanlı yuvarlama kuramsal olarak gerçek; etkisini göstermek için daha uzun
     / çok tohumlu koşu gerekir. Ego'nun kararına bırakıldı.
+- **06.11 NITI doğrulaması (çerçevenin kanıtı):** Aynı çerçeve (Shao'nun yazımıyla SRU, golden/RTL ile bit bit) NITI'nin
+  kendi ağında (vggsmall7, NITI ayarları m_u 5 → 4 → 3; GPU belleği yüzünden batch 128, NITI 256) 30 epoch'ta test
+  %76,45, eğitim %74,73 (1. epoch %36,1; 10. %68,2; 20. %71,8). Önceden belirlenen eşik ≥ %70 → çerçeve sağlam
+  (NITI'nin 200 epoch sonucu %90,7). Sonuç: VGG16-like'ın ~%25'i çerçevedeki bir hatadan değil, 14 katmanlı BN'siz ağın
+  bu ayarlarla eğitilmesinden. `[Ölçüldü]` `sonuc/niti_vggsmall7_b128/egri.csv` (30. epoch'ta durduruldu, durum.pt saklı).
 
 ---
 
