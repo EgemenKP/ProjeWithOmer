@@ -1,7 +1,20 @@
 # ProjeWithOmer
 KNK DEVIATIONS VE TASKS BURAYA
 
-## Güncel durum (03.11.2026)
+## Güncel durum (06.11.2026)
+- **Donanım (`final/rtl/dizi/`):** Shao'nun 16×16 dizili sistemi; 6 test ağında (ag1–ag6) golden'la bit bit aynı
+  (`tb_sistem_dizi` 65.142/65.142, 419.000 çevrim). VGG ölçeği parametreler (512 kanal, batch 256, 15 katman, D103).
+- **Donanımlaştırma (Adım 5c, D94–D107):** döngü sırası, register'lı komut sabitleri, sayaçlı adresler, satır başına
+  line buffer, BP s2 çıkışları PE FIFO'sunda, tek GMS takımı, bank tarafında yazma, gereksiz sıfırlama kapıları yok,
+  MAC seçicisi DSP48E1'de, pipeline aşaması.
+- **Sentez (VC709, 200 MHz hedefi):** toplam LUT 422.611 (%97,6; Shao 171.248), RAMB36 824 (Shao 896), DSP 2.359
+  (Shao 2.324). WNS −12,2 ns (D107 sonrası yeniden ölçülecek). Ayrıntı: DEVIATIONS "Faz 3/4 ölçümü".
+- **CIFAR-10 (Fig. 9, `final/models/cifar/`):** çerçeve NITI'nin kendi ağında doğrulandı (vggsmall7, 30 epoch test
+  %76,5). VGG16-like (D101, tamamen konvolüsyonel) ~%25'te kalıyor; m_u 2 ile 200 epoch koşusu sürüyor (D102).
+- **Testler:** `final/rtl/dizi/run_sim.tcl` (6 test), `final/rtl/sistem/run_sim.tcl` (Adım 4, 6 test),
+  `final/rtl/pe/run_sim.tcl`. Simülasyonda DSP için davranışsal model (`SIM_DAVRANISSAL`, D105).
+
+## Önceki durum (03.11.2026)
 - **Hazır ve Vivado'da doğrulandı:** PE (6 mod), SRU, CLU, ReLU, Weight Update, fonksiyon motoru (ReLU + WU + CLU), Master Controller (FSM) ve tam sistem entegrasyonu.
 - **Tam sistem:** FSM, komutları kendisi üreterek iki test ağının birer eğitim adımını (FP + CLU + BP + WG + ağırlık güncelleme) baştan sona çalıştırıyor. Sonuçlar golden modelle bit bit aynı.
 - **Kapsam dışı:** Pooling (D39).
