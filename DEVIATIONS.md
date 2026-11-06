@@ -1324,6 +1324,18 @@ eğitimin FPGA'da mı yazılım modelinde mi yapıldığı metinde yazmıyor. NI
   bir hiperparametre). `[NITI GitHub]` 5 → 4 → 3 takvimi `ti_vgg.py`'de VGG-small için. Shao m_u'yu vermiyor.
   `[Ölçüldü]` yukarıdaki tablo; gerçek veriyle 2 epoch sonucu aşağıda.
 - **Durum:** Claude, 05.11.
+- **06.11 eki (gözlem ve sorun giderme, karar değişmedi):** m_u 3 koşusu 12 epoch'ta eğitim ~%21'de düzleşti; m_u 2
+  ile yeniden başlatılan koşu 11. epoch'ta %28 / test %31'e çıkıp 24. epoch'ta ~%24'e geriledi (Ego onayıyla durduruldu,
+  `sonuc/vgg16like_int/durum.pt`). Ortak aritmetik kararlar NITI'ye karşı incelendi:
+  - SRU yuvarlaması (SRU-a1, `ALT_YARI = "shao"`): Shao Alg. 1 satır 6 `f[bp/2, 0]`, NITI Alg. 3 `f[bp/2 − 1, 0]`; Shao'nun
+    yazımı her yuvarlamada sıfıra doğru −0,26..−0,38 LSB sapma veriyor (NITI ≈ 0; rastgele 200 bin değerle `[Ölçüldü]`).
+  - D59 sarması: 24. epoch ağırlıklarıyla bir eğitim adımında 18.707 değer (+128 → −128), hepsi grup maksimumu.
+  - 2 epoch'luk ablasyonlar (vgg16like, m_u 2, `--isci 1`, tohum 1), 2. epoch eğitim / test: taban %28,9 / %29,5;
+    `--alt niti --doyma` %31,5 / %35,1; `--grup 0` %30,1 / %31,7; `--alt niti` %27,0 / %22,2; `--doyma` %19,9 / %21,5;
+    `--ae round` %19,4 / %21,4. Aynı aritmetikle iki koşu arasında 1. epoch'ta ~4 puan fark (veri çoğaltması) →
+    farkların çoğu gürültü bandında; açık ve tutarlı bir iyileşme yok. Karar: değişiklik yapılmadı (Ego ile 06.11 gece
+    anlaşması: belirsiz sonuçta değiştirme). Yanlı yuvarlama kuramsal olarak gerçek; etkisini göstermek için daha uzun
+    / çok tohumlu koşu gerekir. Ego'nun kararına bırakıldı.
 
 ---
 
