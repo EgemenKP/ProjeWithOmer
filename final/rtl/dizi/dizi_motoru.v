@@ -303,7 +303,15 @@ module dizi_motoru #(
     endgenerate
 
     // paylaşılan G (Egemen'in global_max_reducer16'sı); İŞ_BAŞLA'da sıfırlanır
-    global_max_reducer16 u_G (.clk(clk), .rst(rst | is_basla), .push(P_gec), .B_flat(lms_B),
+    // D107 (Faz 4): LMS'in B çıkışı G'ye bir register üzerinden gider (en kötü yol P_grup -> LMS -> G'nin CE'siydi,
+    // 51 seviye). G yalnızca işin sonunda (ÖLÇEK komutunda, bitti'den sonra) okunduğu için 1 çevrim gecikme zararsız.
+    reg [NB-1:0]   Q_gec;
+    reg [NB*6-1:0] Q_B;
+    always @(posedge clk) begin
+        Q_gec <= (rst | is_basla) ? {NB{1'b0}} : P_gec;
+        Q_B   <= lms_B;
+    end
+    global_max_reducer16 u_G (.clk(clk), .rst(rst | is_basla), .push(Q_gec), .B_flat(Q_B),
                               .hedef(hedef), .B_max(), .G(G_out));
 
     // ---- Aşama B (A'nın bir çevrim sonrası) ----

@@ -58,6 +58,15 @@ module tb_pe_birlesik;
         begin
             // Önce değişkene al (araç tuzağı 10: XSIM, task'a verilen ifadeyi bozabiliyor)
             c_y = c_yeni; c_e = c_eski; g_y = g_yeni; g_e = g_eski;
+            // D104 (06.11): pe_birlesik seçili olmayan şeritleri / modda çıkışı artık 0'a çekmiyor (eski sarmalayıcı
+            // çekiyor). Yalnızca o modun tüketicilerinin okuduğu kısım karşılaştırılır: zincir modlarında (FP s1/s2,
+            // BP s1) şerit 0, BP s2'de 4 şerit, WG'de akümülatörler; diğer kısım iki tarafta da maskelenir.
+            case (mod)
+                3'd0, 3'd1, 3'd2: begin c_y[127:32] = 96'd0; c_e[127:32] = 96'd0; g_y = 288'd0; g_e = 288'd0; end
+                3'd3:             begin g_y = 288'd0; g_e = 288'd0; end
+                3'd4, 3'd5:       begin c_y = 128'd0; c_e = 128'd0; end
+                default:          begin c_y = 128'd0; c_e = 128'd0; g_y = 288'd0; g_e = 288'd0; end
+            endcase
             kontrol = kontrol + 1;
             if (c_y !== c_e || g_y !== g_e) begin
                 hata = hata + 1;

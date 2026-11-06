@@ -19,7 +19,7 @@ bağlanmamış noktalarda mühendislik tercihi, D-numarasıyla işaretlenip bura
 kayda geçirilir.
 
 **Yeni bir D maddesi eklerken:** Sıradaki boş numaradan devam et (şu an
-**D107**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
+**D108**), asla eskisini silme veya numarayı tekrar kullanma — eski bir D
 kapandıysa bile tarihi referans olarak dursun. Her madde: **ne, neden/kanıt,
 durum**. Kanıt seviyesini etiketle: `[PDF tam]` (makale metninden doğrudan),
 `[PDF şekil]` (yalnızca şekilden, daha zayıf), `[NITI GitHub]` (kod
@@ -1261,6 +1261,19 @@ DSP 55, WNS −12,234 ns (önceki −18,198; en kötü yol artık P_grup → LMS
 LUT 422.611 (VC709'un %97,6'sı; Shao 171.248), RAMB36 824 (%56; Shao 896), DSP 2.359 (Shao 2.324). `[Ölçüldü]`
 Kapı B: hedef ~%85 tutmadı → Ego kararı (LMS/GMS yazım küçültmesi ya da bitirme yolu). Sentez süresi pe_dizi 8 dk 43 sn,
 sistem 9 dk 19 sn, bellek tepesi 6,6 GB.
+
+### D107 — LMS'in B çıkışı global G'ye bir register üzerinden (Faz 4, zamanlama)
+- **Ne:** `dizi_motoru.v`: P aşamasındaki LMS'in B'leri ve geçerli bitleri (Q_B, Q_gec) bir register'dan sonra
+  `global_max_reducer16`'ya gider. G yalnızca işin sonunda (ÖLÇEK, bitti'den sonra) okunduğu için bir çevrim gecikme
+  sonucu değiştirmez; son gönderim M_SON çevrimine düşer, çevrim sayısı değişmez.
+- **Neden:** D106 sonrası sentezde en kötü yol P_grup → LMS → G'nin CE'si (51 seviye, WNS −12,2 ns). `[Çıkarım]`
+- **Kanıt:** `[Ölçüldü]` `tb_dizi_motoru` 57957/57957, `tb_sistem_dizi` 65142/65142 (419000 çevrim, aynı). Mutasyon:
+  gönderim P'den, B Q'dan (hizasız) → 14 hata (yakalandı). Zamanlama etkisi bir sonraki sentezde.
+- **Regresyon (D104/D105 etkisi, aynı commit):** Adım 4 (`final/rtl/sistem/run_sim.tcl`) listesine `mac_dsp.v` +
+  `SIM_DAVRANISSAL`; `tb_pe_birlesik` ve `tb_veriyolu` yalnızca modun okunan şeritlerini karşılaştırıyor (D104
+  sonrası seçilmeyen şeritler 0 değil). XSIM CLI: `tb_fsm` 6206, `tb_sru_buyuk` 8508, `tb_pe_blok` 380490,
+  `tb_pe_birlesik` 80357, `tb_veriyolu` 71048, `tb_sistem` 21415 — altısı PASS (run_sim.tcl'deki beklenenlerle aynı).
+- **Durum:** Claude, 06.11.
 
 ---
 

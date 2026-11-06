@@ -102,7 +102,7 @@ foreach ad {master_controller maks_reg pe_sarmalayici psum_fifo pe_motoru grup_f
 foreach ad {relu_unit wu_unit fe_top} { lappend rtl "$repo/rtl/fe/$ad.v" }
 set rtl [concat $rtl [glob "$repo/rtl/sru/*.v"]]
 # PE: pe_birlesik (sistemde, D69) + Egemen'in bes devresi (tb_pe_blok / tb_pe_birlesik referansi); CLU
-foreach ad {pe/mac pe/pe_birlesik pe/pe_chain3 pe/pe_fp_s2 \
+foreach ad {pe/mac pe/mac_dsp pe/pe_birlesik pe/pe_chain3 pe/pe_fp_s2 \
             pe/pe_bp_s2 pe/pe_wg_s1 pe/pe_wg_s2 clu/max_tree clu/clu_top clu/epu clu/teu \
             clu/adder_tree clu/div_stage_ip} {
     lappend rtl "$repo/rtl/$ad.v"
@@ -184,6 +184,8 @@ foreach tb $testler {
 
     # Simulasyonu $finish'e kadar calistir
     catch {set_property -name {xsim.simulate.runtime} -value {all} -objects [get_filesets $ss]}
+    # D105: mac_dsp'nin davranissal hali (glbl'nin 100 ns GSR'si DSP48E1'in P register'ini ilk hesapta tutar)
+    catch {set_property -name {xsim.compile.xvlog.more_options} -value {-d SIM_DAVRANISSAL} -objects [get_filesets $ss]}
     if {[catch {launch_simulation -simset $ss} hata]} {
         # Derleme/elaborate/simulasyon hatasi: script durmasin, hatayi ozete yaz, siradaki teste gec
         lappend ozet "SONUC $tb: CALISTIRILAMADI (launch_simulation hata verdi; ayrinti asagida)"

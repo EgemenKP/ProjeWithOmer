@@ -133,14 +133,14 @@ class FloatAg(nn.Module):
         return self.ag(x)
 
 
-def veri(batch, isci=4):
+def veri(batch, isci=4, test_batch=500):
     egit_tr = TR.Compose([TR.RandomCrop(32, padding=4), TR.RandomHorizontalFlip(), TR.ToTensor(), TR.Normalize(ORT, STD)])
     test_tr = TR.Compose([TR.ToTensor(), TR.Normalize(ORT, STD)])
     e = torchvision.datasets.CIFAR10(VERI, train=True, download=False, transform=egit_tr)
     t = torchvision.datasets.CIFAR10(VERI, train=False, download=False, transform=test_tr)
     return (torch.utils.data.DataLoader(e, batch, shuffle=True, num_workers=isci, pin_memory=True, drop_last=False,
                                         persistent_workers=isci > 0),
-            torch.utils.data.DataLoader(t, 500, shuffle=False, num_workers=isci, pin_memory=True,
+            torch.utils.data.DataLoader(t, test_batch, shuffle=False, num_workers=isci, pin_memory=True,
                                         persistent_workers=isci > 0))
 
 
@@ -180,6 +180,7 @@ def main():
     ap.add_argument("--olcum", type=int, default=0, help=">0: yalnızca bu kadar adımın süresini ölç")
     ap.add_argument("--devam", action="store_true", help="çıktı klasöründeki durum.pt'den sürdür")
     ap.add_argument("--mu", type=int, default=5, help="m_u takviminin başlangıcı (NITI 5; D102: VGG16(-like) için 3)")
+    ap.add_argument("--test_batch", type=int, default=500, help="test batch'i (int: giriş ölçeği batch başına, D23)")
     ap.add_argument("--log", default="", help="çıktıyı bu dosyaya yaz (konsolsuz pythonw koşusu için)")
     ap.add_argument("--isci", type=int, default=2, help="veri yükleyici işçi sayısı (her biri ~0,76 GB RAM, 05.11)")
     a = ap.parse_args()
@@ -213,7 +214,7 @@ def main():
               f"{a.epoch} epoch ~{s * 196 * a.epoch / 3600:.1f} saat")
         return
 
-    egit_y, test_y = veri(a.batch, a.isci)
+    egit_y, test_y = veri(a.batch, a.isci, a.test_batch)
     if a.mod == "int":
         K = int_ag_kur(a.ag, a.tohum)
     else:

@@ -186,6 +186,9 @@ module tb_veriyolu;
                     kontrol_et(o_v, b_v, "cikis cevrimi");
                     o_v = `MOT.pe_cikis; b_v = 0;
                     for (j2 = 0; j2 < 4; j2 = j2 + 1) b_v[32*j2 +: 32] = iz_cik_v[cik_ptr][j2];
+                    // D104 (06.11): pe_birlesik BP s2 dışında üst şeritleri (1-3) 0'a çekmiyor; tüketici (pe_motoru)
+                    // o modlarda yalnızca şerit 0'ı okuyor. Yalnızca okunan şeritler karşılaştırılır.
+                    if (iz_mod != 3) begin o_v[127:32] = 96'd0; b_v[127:32] = 96'd0; end
                     kontrol_et(o_v, b_v, $sformatf("PE cikisi, cevrim %0d", iz_cik_t[cik_ptr]));
                     cik_ptr = cik_ptr + 1;
                 end
