@@ -1254,6 +1254,14 @@ LUT hücreleri sinyal adına göre sayıldı: ~1.024.000 hücre `v_yaz_veri` (ta
   satır payı eşiği p + 15 → 4725; B'nin adresi P yerine A'dan → 51203. Zamanlama etkisi Faz 3/4 sentezinde.
 - **Durum:** Claude, 06.11.
 
+**Faz 3/4 ölçümü (D103–D106 sonrası sentez, 06.11 gece; `flatten none`, sistem RuntimeOptimized):** `pe_dizi` LUT
+315.801 → 148.214 (PE başına 862 → 271; LUTRAM 44.032 aynı), DSP 2304, WNS +1,000 ns. Sistem parçası LUT 274.397
+(motorun kendi mantığı 68.284, on_getirme 86.405 — 16 GMS'i dahil, 16 LMS ≈ 97k), RAMB36 824 (AW 13; tahmin 832),
+DSP 55, WNS −12,234 ns (önceki −18,198; en kötü yol artık P_grup → LMS → global G'nin CE'si, 51 seviye). **Toplam:**
+LUT 422.611 (VC709'un %97,6'sı; Shao 171.248), RAMB36 824 (%56; Shao 896), DSP 2.359 (Shao 2.324). `[Ölçüldü]`
+Kapı B: hedef ~%85 tutmadı → Ego kararı (LMS/GMS yazım küçültmesi ya da bitirme yolu). Sentez süresi pe_dizi 8 dk 43 sn,
+sistem 9 dk 19 sn, bellek tepesi 6,6 GB.
+
 ---
 
 ## Adım 6 — CIFAR-10 deneyi (Shao Fig. 9'un karşılığı, 04.11.2026)
