@@ -7,10 +7,11 @@ KNK DEVIATIONS VE TASKS BURAYA
 - **Donanımlaştırma (Adım 5c, D94–D107):** döngü sırası, register'lı komut sabitleri, sayaçlı adresler, satır başına
   line buffer, BP s2 çıkışları PE FIFO'sunda, tek GMS takımı, bank tarafında yazma, gereksiz sıfırlama kapıları yok,
   MAC seçicisi DSP48E1'de, pipeline aşaması.
-- **Sentez (VC709, 200 MHz hedefi):** toplam LUT 422.611 (%97,6; Shao 171.248), RAMB36 824 (Shao 896), DSP 2.359
-  (Shao 2.324). WNS −12,2 ns (D107 sonrası yeniden ölçülecek). Ayrıntı: DEVIATIONS "Faz 3/4 ölçümü".
+- **Sentez (VC709, 200 MHz hedefi, 07.11):** toplam LUT 436.340 (%100,7; Shao 171.248), RAMB36 824 (Shao 896), DSP
+  2.354 (Shao 2.324). WNS −11,85 ns (~59 MHz; en kötü yol CLU → bölücü). Güç ≈ 24,3 W (vektörsüz tahmin; Shao 16,27).
+  Etkin 54,4 GOPS (D108; Shao 771). Ayrıntı: DEVIATIONS D107 "Faz 4 ölçümü", `final/SONUCLAR.md`.
 - **CIFAR-10 (Fig. 9, `final/models/cifar/`):** çerçeve NITI'nin kendi ağında doğrulandı (vggsmall7, 30 epoch test
-  %76,5). VGG16-like (D101, tamamen konvolüsyonel) ~%25'te kalıyor; m_u 2 ile 200 epoch koşusu sürüyor (D102).
+  %76,5). VGG16-like (D101, tamamen konvolüsyonel) 200 epoch: test %21,6 (Shao ~%88); VGG16 referansı koşulmadı.
 - **Testler:** `final/rtl/dizi/run_sim.tcl` (6 test), `final/rtl/sistem/run_sim.tcl` (Adım 4, 6 test),
   `final/rtl/pe/run_sim.tcl`. Simülasyonda DSP için davranışsal model (`SIM_DAVRANISSAL`, D105).
 

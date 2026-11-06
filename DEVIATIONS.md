@@ -51,7 +51,7 @@ tercihi), `[Varsayım]` (geçici, netleşmemiş).
 | **`final/`: `run_sim.tcl` (sistem, pe, sru, clu, fe)** | Tamamlandı | Beşi de Vivado'da gerçek bölücü IP'siyle PASS (Ego, 04.11); `tb_sru_gradyan` yalnızca `sru` script'inde (aşağıda 04.11 notu) | `final/rtl/*/run_sim.tcl` |
 | **Adım 5a: 16×16 PE dizisi (D72–D75)** | Tamamlandı; D104/D105 ile güncellendi | `tb_pe_dizi` 2.363.392/2.363.392 (XSIM CLI, D105 sonrası davranışsal DSP modeliyle), 7 mutasyonun 7'si yakalandı | `final/rtl/dizi/pe_dizi.v` |
 | **Adım 5b: 16×16 dizili tam sistem (D76–D93)** | Tamamlandı | ag1–ag4 golden'la bit bit (04.11); bugün ag1–ag6 için aşağıdaki satır geçerli. Vivado'da gerçek bölücü IP'siyle henüz koşulmadı (Ego) | `final/rtl/dizi/`, `final/models/sistem/` |
-| **Adım 5c: donanımlaştırma (D94–D100) + Faz 2–4 (D103–D107)** | Tamamlandı | XSIM CLI, ag1–ag6: `tb_dizi_motoru` 57.957/57.957, `tb_sistem_dizi` 65.142/65.142 (419.000 çevrim); Egemen'in PE testleri DSP modeliyle PASS; Adım 4'ün 6 testi PASS (D107 kaydı). Sentez (`flatten none`): LUT 422.611 (%97,6), RAMB36 824, DSP 2.359, WNS −12,2 ns (D107 öncesi) | `final/rtl/dizi/`, `final/rtl/pe/mac_dsp.v` |
+| **Adım 5c: donanımlaştırma (D94–D100) + Faz 2–4 (D103–D107)** | Tamamlandı | XSIM CLI, ag1–ag6: `tb_dizi_motoru` 57.957/57.957, `tb_sistem_dizi` 65.142/65.142 (419.000 çevrim); Egemen'in PE testleri DSP modeliyle PASS; Adım 4'ün 6 testi PASS (D107 kaydı). Sentez (`flatten none`, zamanlamaya duyarlı, D107 dahil): LUT 436.340 (%100,7), RAMB36 824, DSP 2.354, WNS −11,85 ns (~59 MHz; en kötü yol CLU → bölücü), güç ≈ 24,3 W (vektörsüz) | `final/rtl/dizi/`, `final/rtl/pe/mac_dsp.v` |
 | **Adım 6: CIFAR-10 (Fig. 9) (D87–D89, D101, D102)** | Sürüyor | `kontrol_hizli.py` 6/6 (hizli_model golden'la bit bit); çerçeve NITI'nin vggsmall7'siyle doğrulandı (30 epoch test %76,45); VGG16-like 200 epoch koşusu sürüyor, VGG16 referansı sırada | `final/models/cifar/` |
 
 ---
@@ -1282,6 +1282,13 @@ sistem 9 dk 19 sn, bellek tepesi 6,6 GB.
   12, `tb_sru_katman` 52, `tb_sru_top` 52, `tb_lms_uc` 20013, `tb_sru_gradyan` 1865; clu `tb_clu` 40; clu_yuvarlama
   `tb_stok_yuvarla` 40960; fe `tb_relu` 196608, `tb_wu` 65536, `tb_fe_top` 456144 — 13'ü PASS. Böylece yedi klasörün
   (pe, sru, clu, clu_yuvarlama, fe, sistem, dizi) hepsi D107 sonrası PASS. Gerçek bölücü IP'siyle Vivado koşusu: Ego.
+- **Faz 4 ölçümü (D107 sonrası, 07.11 gece; sistem zamanlamaya duyarlı sentez, `flatten none`, 15 dk):** sistem LUT
+  288.126 (hızlı sentezde 274.397), FF 28.176, RAMB36 824, DSP 50; WNS −11,849 ns (önceki −12,234). En kötü yol artık
+  motorda değil, CLU'da: `u_fe/a_r_reg` → bölücü IP girişi, 68 seviye (46 CARRY4); ilk 10 yolun hepsi bu. Toplam
+  (pe_dizi + sistem): LUT 436.340 (%100,7), FF 68.368, LUTRAM 45.174, RAMB36 824, DSP 2.354; ulaşılan frekans tahmini
+  ~59 MHz. Güç (`report_power`, vektörsüz, 200 MHz, güven Medium): pe_dizi 9,47 W (dinamik 9,03; DSP 4,67), sistem
+  15,26 W (dinamik 14,64; BRAM 4,37), toplam ≈ 24,3 W (statik bir kez) → etkin 2,24 GOPS/W (D108). `[Ölçüldü]`
+  CLU yolu sınırlama olarak yazıldı (Shao CLU bölümünde "multi-stage pipelines" anıyor); durdurma kuralı gereği değiştirilmedi.
 - **Durum:** Claude, 06.11.
 
 ---

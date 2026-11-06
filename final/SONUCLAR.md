@@ -8,13 +8,13 @@ Etiketler: `[Ölçüldü]` araçla ölçülen sayı; `[Çıkarım]` makalede yaz
 
 | Kaynak | Shao | Bizim | Not |
 |---|---|---|---|
-| LUT | 171.248 (%39,5) | 422.611 (%97,6) | `[Ölçüldü]` sentez, `flatten none`; pe_dizi 148.214 + sistem 274.397 (D103–D106 sonrası) |
-| LUTRAM | 24.704 | 45.182 | `[Ölçüldü]` pe_dizi 44.032 (256 PE'nin Psum FIFO'ları) + sistem 1.150 |
-| FF | 143.565 | 68.234 | `[Ölçüldü]` pe_dizi 40.192 + sistem 28.042 (D107'nin ~100 FF'i hariç) |
+| LUT | 171.248 (%39,5) | 436.340 (%100,7) | `[Ölçüldü]` zamanlamaya duyarlı sentez, `flatten none`, D107 dahil: pe_dizi 148.214 + sistem 288.126 (hızlı sentezde 274.397; toplam 422.611, %97,6) |
+| LUTRAM | 24.704 | 45.174 | `[Ölçüldü]` pe_dizi 44.032 (256 PE'nin Psum FIFO'ları) + sistem 1.142 |
+| FF | 143.565 | 68.368 | `[Ölçüldü]` pe_dizi 40.192 + sistem 28.176 |
 | BRAM (RAMB36) | 896 | 824 | `[Ölçüldü]`; tampon boyu Shao'da yok, Table I'e yakın seçildi (D103, `[Çıkarım]`) |
-| DSP | 2.324 | 2.359 | `[Ölçüldü]` 2304 MAC (D105, DSP48E1'de) + 55 (SRU/CLU) |
+| DSP | 2.324 | 2.354 | `[Ölçüldü]` 2304 MAC (D105, DSP48E1'de) + 50 (SRU/CLU) |
 
-- Sentez sonrası rapor; place & route yapılmadı (Kapı B: LUT %97,6 yerleştirmeye uygun değil, ~%85 gerekir).
+- Sentez sonrası rapor; place & route yapılmadı (LUT %100,7: tasarım VC709'a sığmıyor; yerleştirme için ~%85 gerekir).
 - LUT farkının büyük kalemleri (D103–D106 ölçümü): 16 LMS ≈ 97k, ön-getirme + 16 GMS 86k, motor 68k. Shao'nun
   bu bloklar için ayrıntı vermemesi yüzünden farkın tam nedeni bilinmiyor `[Çıkarım]`.
 
@@ -22,11 +22,17 @@ Etiketler: `[Ölçüldü]` araçla ölçülen sayı; `[Çıkarım]` makalede yaz
 
 | | Shao | Bizim | Not |
 |---|---|---|---|
-| Frekans | 200 MHz | WNS −12,2 ns @ 5 ns (D107 öncesi) | `[Ölçüldü]`; D107 sonrası `[Bekliyor]` |
+| Frekans | 200 MHz | WNS −11,85 ns @ 5 ns → ~59 MHz | `[Ölçüldü]` sentez sonrası tahmin (D107 öncesi −12,23). pe_dizi tek başına +1,0 ns (200 MHz tutuyor) |
 | Tepe | — (yazılmamış) | 921,6 GOPS | 2304 MAC × 2 × 200 MHz |
 | Başarım | 771 GOPS | 54,4 GOPS (etkin, VGG16-like, batch 256) | `[Ölçüldü]` model, RTL'e komut komut eşit (D108) |
-| Güç | 16,27 W | — | `[Bekliyor]` sentez sonrası `report_power` (vektörsüz tahmin) |
-| Verim | 47,38 GOPS/W | — | `[Bekliyor]` |
+| Güç | 16,27 W | 24,3 W | `[Ölçüldü]` sentez sonrası vektörsüz `report_power` @ 200 MHz (güven "Medium"): dinamik pe_dizi 9,03 + sistem 14,64, statik 0,62 (bir kez) |
+| Verim | 47,38 GOPS/W | 2,24 GOPS/W (tepe ile 37,9) | etkin GOPS / güç |
+
+- 200 MHz: D107 motordaki yolu kırdı; en kötü yol artık CLU'da: `u_fe/a_r` → bölücü IP'sinin girişi, 68 seviye
+  (46 CARRY4). Shao CLU için "multi-stage pipelines" eklediğini yazıyor (CLU bölümü, s. 5); bizim CLU'da bu yolda register yok.
+  Sınırlama olarak yazıldı, değiştirilmedi (durdurma kuralı).
+- Güç: sentez sonrası ve gerçek anahtarlama verisi olmadan; tasarım 200 MHz'i tutmadığı halde 200 MHz'de hesaplandı
+  (Shao'yla aynı frekansta kıyas için). Shao ölçüm mü tahmin mi yazmıyor.
 
 - Shao GOPS'un hesabını yazmıyor; 771, tepenin %83,7'si `[Çıkarım]`.
 - Bizim etkin GOPS'un düşük olma nedeni (D108): çevrimlerin %80'i yükleme ve komut başı/sonu (komutlar sırayla,
