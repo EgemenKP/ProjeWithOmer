@@ -1486,3 +1486,10 @@ eğitimin FPGA'da mı yazılım modelinde mi yapıldığı metinde yazmıyor. NI
    batch'te kabul edildi ama GUI koşusunda kullanılmadı (yine `add_wave /`). Çözüm: testbench'i sinyalsiz
    bir üst modülün içine koy (`module tb; tb_govde govde (); endmodule`); başlatma script'i üst seviyede
    sinyal bulamayınca dalga açmıyor (`get_objects` = 0, `[Ölçüldü]`).
+- **Vivado 2026.1, project modu simülasyon (07.11):** `create_fileset -simset` ile kurulan simset'te
+  `xsim.compile.xvlog.more_options` (ve `verilog_define`) ayarlanıyor, `get_property` ile okunuyor ama simset **etkin
+  değilse** `compile.bat`'e yazılmıyor; `launch_simulation -simset` bunu sessizce atlıyor. Sonuç: `-d SIM_DAVRANISSAL`
+  düştü, 2304 DSP48E1 primitifi simüle edildi (`tb_dizi_motoru` 1 saatte bitmedi). Çözüm: `launch_simulation`'dan önce
+  `current_fileset -simset [get_filesets $ss]` `[Ölçüldü]` (batch'te `-scripts_only` ile 4 deneme). dizi, pe, sistem
+  `run_sim.tcl`'lerine eklendi; tanım derlemeye geçmezse OZET'e "UYARI" satırı yazılıyor. Önceki GUI koşusunda biten
+  `tb_pe_dizi`, `tb_grup_kurucu`, `tb_on_getirme` PASS'leri primitifle alındı (geçerli).

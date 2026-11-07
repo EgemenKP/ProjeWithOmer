@@ -168,6 +168,8 @@ foreach tb $testler {
     # Eski sonuc dosyalari yaniltmasin
     file delete -force "$vek/sonuc_$tb.txt" "$calisma/sonuc_$tb.txt"
 
+    # 07.11: xsim.*.more_options yalnizca ETKIN simset'te script'lere geciyor (Vivado 2026.1); once etkin yap
+    current_fileset -simset [get_filesets $ss]
     # Vektor klasorunu testbench'e +VEKTOR_DIZINI ile ver
     if {[catch {set_property -name {xsim.simulate.xsim.more_options} \
                     -value "-testplusarg VEKTOR_DIZINI=$vek/" \
@@ -185,7 +187,7 @@ foreach tb $testler {
     # Simulasyonu $finish'e kadar calistir
     catch {set_property -name {xsim.simulate.runtime} -value {all} -objects [get_filesets $ss]}
     # D105: mac_dsp'nin davranissal hali (glbl'nin 100 ns GSR'si DSP48E1'in P register'ini ilk hesapta tutar)
-    catch {set_property -name {xsim.compile.xvlog.more_options} -value {-d SIM_DAVRANISSAL} -objects [get_filesets $ss]}
+    set_property -name {xsim.compile.xvlog.more_options} -value {-d SIM_DAVRANISSAL} -objects [get_filesets $ss]
     if {[catch {launch_simulation -simset $ss} hata]} {
         # Derleme/elaborate/simulasyon hatasi: script durmasin, hatayi ozete yaz, siradaki teste gec
         lappend ozet "SONUC $tb: CALISTIRILAMADI (launch_simulation hata verdi; ayrinti asagida)"
@@ -211,6 +213,11 @@ foreach tb $testler {
         catch {close_sim -force}
         continue
     }
+    set dsp_ok 0
+    foreach g [glob -nocomplain "$calisma/compile.bat" "$calisma/*.prj"] {
+        set kanal [open $g r] ; if {[string first SIM_DAVRANISSAL [read $kanal]] >= 0} { set dsp_ok 1 } ; close $kanal
+    }
+    if {!$dsp_ok} { lappend ozet "UYARI $tb: SIM_DAVRANISSAL derlemeye gecmedi (DSP48E1 primitifi simule edildi)" }
     catch {run all}
     catch {close_sim -force}
 

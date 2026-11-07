@@ -74,12 +74,19 @@ foreach {kosu kaynaklar} [list \
         file copy -force $vek "$calisma/pe_vectors"
         catch {set_property -name {xsim.simulate.runtime} -value {all} -objects [get_filesets $ss]}
         # D105: mac_dsp'nin davranissal hali (glbl'nin 100 ns GSR'si DSP48E1'in P register'ini ilk hesapta tutar)
-        catch {set_property -name {xsim.compile.xvlog.more_options} -value {-d SIM_DAVRANISSAL} -objects [get_filesets $ss]}
+        # 07.11: more_options yalnizca ETKIN simset'te derlemeye geciyor (Vivado 2026.1); etkin yapilmazsa sessizce duser
+        current_fileset -simset [get_filesets $ss]
+        set_property -name {xsim.compile.xvlog.more_options} -value {-d SIM_DAVRANISSAL} -objects [get_filesets $ss]
         if {[catch {launch_simulation -simset $ss} hata]} {
             lappend ozet "SONUC $tb: CALISTIRILAMADI ([string range $hata 0 160])"
             catch {close_sim -force}
             continue
         }
+        set dsp_ok 0
+        foreach g [glob -nocomplain "$calisma/compile.bat" "$calisma/*.prj"] {
+            set kanal [open $g r] ; if {[string first SIM_DAVRANISSAL [read $kanal]] >= 0} { set dsp_ok 1 } ; close $kanal
+        }
+        if {!$dsp_ok} { lappend ozet "UYARI $tb: SIM_DAVRANISSAL derlemeye gecmedi (DSP48E1 primitifi simule edildi)" }
         catch {run all}
         catch {close_sim -force}
         lappend ozet [log_sonucu $tb "$calisma/simulate.log"]
