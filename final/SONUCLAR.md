@@ -49,8 +49,11 @@ Etiketler: `[Ölçüldü]` araçla ölçülen sayı; `[Çıkarım]` makalede yaz
 
 - Aritmetik çerçeve (hizli_model = golden = RTL, bit bit) NITI'nin kendi ağında doğrulandı: vggsmall7, 30 epoch test
   %76,45 (eşik %70; NITI'nin 200 epoch sonucu %90,7) `[Ölçüldü]`.
-- VGG16-like'ın ~%25 doğrulukta kalması çerçevedeki bir hatadan değil, 14 katmanlı BN'siz ağın bu ayarlarla
-  eğitilmesinden `[Çıkarım, D102]`. Shao'nun bu ağı nasıl eğittiği (m_u takvimi, başlatma, öğrenme ayarları) metinde yok.
+- Teşhis koşusu (07.11): aynı VGG16-like, aynı başlatma (Xavier) ve veri, **float32** (SGD 0.01, momentum 0.9,
+  lr 15. ve 22. epoch'ta ×0,1), 30 epoch: test doğruluğu **%64,10** (ilk 4 epoch şans düzeyinde, 5. epoch'ta kalkıyor)
+  `[Ölçüldü]`; aynı noktada int %22,92. Yani ağ eğitilebilir; tıkanma int8 eğitiminde (bu derinlikte NITI/Shao
+  aritmetiği + bizim m_u takvimi). Hangi parçası olduğu ayrıştırılmadı `[Çıkarım]`. Shao'nun bu ağı nasıl eğittiği
+  (m_u takvimi, başlatma, öğrenme ayarları) metinde yok. Float eğrisi: `final/models/cifar/sonuc/vgg16like_float30/`.
 - Ağın sonu: son max-pool + FC, Shao'nun kuralıyla tek s2 conv (D101) `[Çıkarım]`.
 
 ## 4. Bilinen sınırlamalar
