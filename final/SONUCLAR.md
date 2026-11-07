@@ -58,7 +58,8 @@ Etiketler: `[Ölçüldü]` araçla ölçülen sayı; `[Çıkarım]` makalede yaz
 2. Pooling birimi yok (D39); VGG16 referansı yalnızca yazılımda (hizli_model'in maxpool/FC yolu).
 3. Harici bellek / DDR yok; VGG ölçeği veri çip üstüne sığmaz (D103).
 4. Komutlar sırayla, yükleme ile hesap örtüşmüyor (D50) → etkin GOPS düşük (D108).
-5. Gerçek bölücü IP'siyle sistem koşusu Ego'da (bütün CLI koşuları davranışsal modelle).
+5. ~~Gerçek bölücü IP'siyle sistem koşusu~~ kapandı: Ego, 07.11, Vivado'da `dizi/run_sim.tcl`, gerçek IP'yle altı test
+   PASS (`tb_sistem_dizi` 65.142/65.142, 419.000 çevrim; CLI'daki davranışsal modelle aynı sayılar).
 
 ## 5. Ego için: neyi kendin biliyorsun, ne Claude'dan geldi
 - **Senin işin / bizzat doğrulanabilir:** PE ve SRU modülleri (Egemen'in testleri), Vivado'daki run_sim koşuları,

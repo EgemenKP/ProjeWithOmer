@@ -25,8 +25,8 @@
 #    SONUC tb_dizi_motoru: PASS 57957/57957 (6 ag, 7243 DIZI komutu, 57801 kelime)
 #    SONUC tb_fsm_dizi: PASS 80832/80832 (6 ag, 8082 komut)
 #    SONUC tb_sistem_dizi: PASS 65142/65142 (6 ag, 65037 kelime, 419000 cevrim)
-#  (06.11, D106/D107 sonrasi, ag6 dahil; davranissal bolucuyle XSIM CLI. Gercek IP'yle Vivado'da henuz kosulmadi.
-#   tb_on_getirme ag6 yuzunden uzun: XSIM'de ~10-15 dk.)
+#  (06.11, D106/D107 sonrasi, ag6 dahil; davranissal bolucuyle XSIM CLI. 07.11: Ego, Vivado'da gercek IP'yle ayni sayilar.
+#   tb_on_getirme ag6 yuzunden uzun: XSIM'de ~10-15 dk; tb_sistem_dizi Vivado'da ~17 dk.)
 #  Sure: tb_pe_dizi komut satirindaki XSIM'de ~4 dk (512 PE), digerleri birer-iki dakika.
 #  tb_pe_dizi disindaki testbench'lerin ust modulunde sinyal yok (govde alt modulde): Vivado'nun dalga
 #  gorunumu buyuk register'li testbench'lerde cokuyordu (arac tuzagi 13); boylece dalga penceresi acilmiyor.
