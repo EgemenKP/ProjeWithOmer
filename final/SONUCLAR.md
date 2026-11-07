@@ -53,7 +53,7 @@ Etiketler: `[Ölçüldü]` araçla ölçülen sayı; `[Çıkarım]` makalede yaz
   lr 15. ve 22. epoch'ta ×0,1), 30 epoch: test doğruluğu **%64,10** (ilk 4 epoch şans düzeyinde, 5. epoch'ta kalkıyor)
   `[Ölçüldü]`; aynı noktada int %22,92. Yani ağ eğitilebilir; tıkanma int8 eğitiminde (bu derinlikte NITI/Shao
   aritmetiği + bizim m_u takvimi). Hangi parçası olduğu ayrıştırılmadı `[Çıkarım]`. Shao'nun bu ağı nasıl eğittiği
-  (m_u takvimi, başlatma, öğrenme ayarları) metinde yok. Float eğrisi: `final/models/cifar/sonuc/vgg16like_float30/`.
+  (m_u takvimi, başlatma, öğrenme ayarları) metinde yok. Float eğrisi: `final/models/cifar/sonuc/vgg16like_float30/` (yerel; `sonuc/` repo'da yok).
 - Ağın sonu: son max-pool + FC, Shao'nun kuralıyla tek s2 conv (D101) `[Çıkarım]`.
 
 ## 4. Bilinen sınırlamalar
